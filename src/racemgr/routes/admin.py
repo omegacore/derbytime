@@ -43,10 +43,12 @@ from ..services.schedule import (
     MAX_RACES,
     generate_group_rounds,
     group_rounds,
+    heat_editor,
     projected_finish,
     race_order,
     regenerate,
     remove_pass,
+    save_heat_lineups,
     schedule_problems,
     set_race_order,
 )
@@ -319,13 +321,59 @@ async def admin_add_pass(event_id: int, request: Request, s: Session = Depends(g
 
 @router.post("/round/{round_id}/remove")
 async def admin_remove_pass(round_id: int, request: Request, s: Session = Depends(get_session), me=Depends(get_official), rs: RaceService = Depends(race)):
-    rnd = s.get(Round, round_id)
-    if not rnd:
-        raise ServiceError("Round not found", 404)
+    rnd = get_round(s, round_id)
 
     async def fn(ev):
         remove_pass(s, rnd, auth.actor_for(me))
     return await _schedule_action(request, rnd.event_id, s, me, rs, fn, "Run removed.")
+
+
+def get_round(s: Session, round_id: int) -> Round:
+    rnd = s.get(Round, round_id)
+    if not rnd:
+        raise ServiceError("Round not found", 404)
+    return rnd
+
+
+@router.get("/round/{round_id}/heats")
+def admin_heats(round_id: int, request: Request, s: Session = Depends(get_session), me=Depends(get_official)):
+    """Hand-edit a run's unraced heats (e.g. to fix a heat with one car)."""
+    admin_only(me)
+    rnd = get_round(s, round_id)
+    ev = get_event(s, rnd.event_id)
+    return render(request, "admin/heats.html", {"event": ev, "round": rnd, **heat_editor(s, ev, rnd)})
+
+
+@router.post("/round/{round_id}/heats")
+async def admin_save_heats(round_id: int, request: Request, s: Session = Depends(get_session), me=Depends(get_official), rs: RaceService = Depends(race)):
+    admin_only(me)
+    rnd = get_round(s, round_id)
+    ev = get_event(s, rnd.event_id)
+    raw = await request.form()
+    url = f"/admin/round/{rnd.id}/heats"
+    rows = []
+    try:
+        # one "row" field per heat, in the new queue order; its lanes are "lane-<row>-<lane>"
+        for row in raw.getlist("row"):
+            key, _, heat = str(row).partition(":")
+            prefix = f"lane-{key}-"
+            lineup = {int(k[len(prefix):]): int(v) if v else None for k, v in raw.multi_items() if k.startswith(prefix)}
+            rows.append((heat, lineup))
+    except ValueError:
+        return back(url, "Invalid form.", True)
+    try:
+        r = save_heat_lineups(s, ev, rnd, str(raw.get("version", "")), rows, auth.actor_for(me))
+        s.commit()
+    except ServiceError as e:
+        s.rollback()
+        return back(url, e.message, True)
+    await rs.sync_timers()
+    msg = f"Heats saved: {r['heats']} to race."
+    if r["added"]:
+        msg += f" {r['added']} added."
+    if r["removed"]:
+        msg += f" {r['removed']} emptied and removed."
+    return back(url, msg)
 
 
 @router.post("/event/{event_id}/clear")

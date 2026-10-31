@@ -85,6 +85,13 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .badge.rerun, .badge.bad { background: var(--bad-bg); color: var(--bad); }
 .badge.ok { background: var(--ok-bg); color: var(--ok); }
 .flag { color: var(--bad); font-weight: 700; }
+/* admin heat editor */
+.heat-edit td { white-space: nowrap; }
+.heat-edit select { min-width: 8.5em; }
+.heat-edit select.dup { border-color: var(--bad); background: var(--bad-bg); }
+.heat-edit tr.solo { background: var(--warn-bg); }
+.heat-edit tr.locked { color: var(--muted); }
+.heat-edit .order-btns button { min-height: 36px; padding: 4px 10px; }
 tr.flagged td { background: var(--bad-bg); }
 
 .msg { padding: 10px 14px; border-radius: 10px; margin-bottom: 12px; }

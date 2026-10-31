@@ -120,13 +120,14 @@
     <p class="small muted">Rebuilds every heat that hasn't raced from the current check-ins, tracks and working lanes. Heats already raced, staged or waiting for approval are kept with their results. A late arrival gets a full set of runs.</p>
 
     <h3>Race order</h3>
-    <p class="small muted">Drag ☰ (or use ↑ ↓) to rearrange. Changes go live on the tracks right away. Finished runs stay in the list for reference.</p>
+    <p class="small muted">Drag ☰ (or use ↑ ↓) to rearrange. Changes go live on the tracks right away. Finished runs stay in the list for reference. Use <strong>edit heats</strong> to move scouts between a run's unraced heats.</p>
     <ol id="race-order" class="order-list" data-event="{{ event.id }}">
       {% for o in order %}
       <li data-id="{{ o.round.id }}" class="order-item state-{{ o.state }}">
         <span class="handle" aria-hidden="true">☰</span>
         <span class="order-name"><strong>{{ o.round.name }}</strong>
-          <span class="small muted">{{ o.done }}/{{ o.total }} heats{% if o.round.races %} · {{ o.round.races }} race{{ '' if o.round.races == 1 else 's' }} each{% endif %}{% if multi_track and o.tracks %} · {{ o.tracks | join(' + ') }}{% endif %}</span></span>
+          <span class="small muted">{{ o.done }}/{{ o.total }} heats{% if o.round.races %} · {{ o.round.races }} race{{ '' if o.round.races == 1 else 's' }} each{% endif %}{% if multi_track and o.tracks %} · {{ o.tracks | join(' + ') }}{% endif %}
+            · <a href="/admin/round/{{ o.round.id }}/heats">edit heats</a>{% if o.solo %} <span class="flag">· {{ o.solo }} heat{{ '' if o.solo == 1 else 's' }} with 1 car</span>{% endif %}</span></span>
         <span class="badge {{ 'approved' if o.state == 'done' else 'armed' if o.state == 'racing' else 'scheduled' }}">{{ o.state }}</span>
         <span class="order-btns">
           <button type="button" class="small" data-move="-1" aria-label="Move up">↑</button>

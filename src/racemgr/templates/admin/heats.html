@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}{{ round.name }} heats · admin{% endblock %}
+{% macro car_label(c) %}#{{ c.number }} {{ c.racer_name.split(' ')[0] }}{% if ' ' in c.racer_name %} {{ c.racer_name.split(' ')[-1][:1] }}.{% endif %}{% if c.status %} ({{ c.status }}){% endif %}{% endmacro %}
+{% macro lane_select(key, lane, chosen) %}
+<select name="lane-{{ key }}-{{ lane }}" data-lane="{{ lane }}" aria-label="Lane {{ lane }}">
+  <option value="">— empty —</option>
+  {% for eid, c in choices.items() %}<option value="{{ eid }}" {% if eid == chosen %}selected{% endif %}>{{ car_label(c) }}</option>{% endfor %}
+</select>
+{% endmacro %}
+{% block content %}
+<p class="small"><a href="/admin/event/{{ event.id }}">← {{ event.name }}</a></p>
+<h1>{{ round.name }} <span class="muted small">heats</span></h1>
+
+<section class="card">
+  <p class="small muted">Pick a car for each lane to rearrange the heats that haven't raced yet. Use ↑ ↓ to change the order they race in. Empty every lane of a heat to remove it, or add a heat at the bottom. Raced and staged heats are shown greyed out and can't change. Saving puts the new lineups on the tracks right away.</p>
+  <p class="small muted"><strong>Note:</strong> regenerating the schedule, changing a track's lanes, or withdrawing a scout rebuilds every unraced heat and replaces these edits.</p>
+
+  <form method="post" action="/admin/round/{{ round.id }}/heats" id="heat-editor" data-target="{{ target or '' }}">
+    <input type="hidden" name="version" value="{{ version }}">
+    <div class="table-wrap"><table class="heat-edit">
+      <thead><tr><th></th><th class="num">Heat</th>{% for l in lane_numbers %}<th>Lane {{ l }}</th>{% endfor %}<th></th></tr></thead>
+      <tbody id="heat-rows">
+      {% for r in rows %}
+        {% if r.editable %}
+        <tr class="heat-row" data-row>
+          <td class="order-btns">
+            <input type="hidden" name="row" value="h{{ r.heat.id }}:{{ r.heat.id }}">
+            <button type="button" class="small" data-move="-1" aria-label="Move up">↑</button>
+            <button type="button" class="small" data-move="1" aria-label="Move down">↓</button>
+          </td>
+          <td class="num"><strong data-number>{{ r.heat.number }}</strong></td>
+          {% for l in lane_numbers %}<td>{% if l in r.lanes %}{{ lane_select('h' ~ r.heat.id, l, r.lanes[l]) }}{% else %}<span class="muted">—</span>{% endif %}</td>{% endfor %}
+          <td class="small heat-warn" data-warn></td>
+        </tr>
+        {% else %}
+        <tr class="heat-row locked" data-locked>
+          <td></td>
+          <td class="num">{{ r.heat.number }}</td>
+          {% for l in lane_numbers %}<td{% if r.lanes.get(l) %} data-entry="{{ r.lanes[l] }}" data-lane="{{ l }}"{% endif %}>{% if r.lanes.get(l) %}{{ car_label(choices[r.lanes[l]]) }}{% elif l in r.lanes %}<span class="bye">empty</span>{% else %}<span class="muted">—</span>{% endif %}</td>{% endfor %}
+          <td><span class="badge {{ r.heat.status.value }}">{{ r.heat.status.value }}{% if r.heat.rerun_of_id %} re-run{% endif %}</span></td>
+        </tr>
+        {% endif %}
+      {% endfor %}
+      </tbody>
+    </table></div>
+    <template id="new-heat">
+      <tr class="heat-row" data-row>
+        <td class="order-btns">
+          <input type="hidden" name="row" value="KEY:new">
+          <button type="button" class="small" data-move="-1" aria-label="Move up">↑</button>
+          <button type="button" class="small" data-move="1" aria-label="Move down">↓</button>
+        </td>
+        <td class="num"><strong data-number>new</strong></td>
+        {% for l in lane_numbers %}<td>{% if l in new_lanes %}{{ lane_select('KEY', l, None) }}{% else %}<span class="muted">—</span>{% endif %}</td>{% endfor %}
+        <td class="small heat-warn" data-warn></td>
+      </tr>
+    </template>
+    <div class="row" style="margin-top:10px">
+      <button type="button" id="add-heat">Add a heat</button>
+      <button class="primary" type="submit">Save heats</button>
+      <a class="btn" href="/admin/round/{{ round.id }}/heats">Undo changes</a>
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Races per scout</h2>
+  <p class="small muted">Counts raced and unraced heats in this run{% if target %} (target: {{ target }} race{{ '' if target == 1 else 's' }} each){% endif %}. Updates as you edit.</p>
+  <div class="table-wrap"><table id="heat-summary">
+    <thead><tr><th class="num">#</th><th>Scout</th><th class="num">Races</th><th>Lanes</th></tr></thead>
+    <tbody>{% for eid, c in choices.items() %}
+      <tr data-entry="{{ eid }}"><td class="num">{{ c.number }}</td><td>{{ c.racer_name }}{% if c.status %} <span class="badge bad">{{ c.status }}</span>{% endif %}</td><td class="num" data-count></td><td class="small" data-lanes></td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="/static/heat_edit.js"></script>
+{% endblock %}

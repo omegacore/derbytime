@@ -417,7 +417,9 @@ def race_order(session: Session, event: Event) -> list[dict[str, Any]]:
     """Rows for the admin race-order list."""
     rows = []
     tracks = {t.id: t for t in session.exec(select(Track).where(Track.event_id == event.id))}
-    for r in group_rounds(session, event.id):
+    runs = group_rounds(session, event.id)
+    solo = solo_heats(session, [r.id for r in runs])
+    for r in runs:
         heats = session.exec(select(Heat.status, Heat.track_id).where(Heat.round_id == r.id, Heat.status != HeatStatus.rerun)).all()
         statuses = [s for s, _ in heats]
         done = sum(1 for s in statuses if s == HeatStatus.approved)
@@ -431,9 +433,145 @@ def race_order(session: Session, event: Event) -> list[dict[str, Any]]:
                 "total": len(statuses),
                 "state": "done" if statuses and done == len(statuses) else "racing" if live or done else "waiting",
                 "removable": not _round_started(session, r.id),
+                "solo": solo.get(r.id, 0),
             }
         )
     return rows
+
+
+# --- hand-editing a run's heats -------------------------------------------------
+
+
+def _editable(heat: Heat) -> bool:
+    """Only heats still waiting in the queue can be rearranged; a scheduled
+    re-run keeps the lineup it is re-running."""
+    return heat.status == HeatStatus.scheduled and heat.rerun_of_id is None
+
+
+def solo_heats(session: Session, round_ids: list[int]) -> dict[int, int]:
+    """Round id -> unraced heats with only one car in them."""
+    heats = list(session.exec(select(Heat).where(col(Heat.round_id).in_(round_ids), Heat.status == HeatStatus.scheduled)))
+    cars = views.occupied_lanes(session, [h.id for h in heats])
+    return dict(Counter(h.round_id for h in heats if len(cars[h.id]) == 1))
+
+
+def _new_heat_track(session: Session, event: Event, rnd: Round) -> Track:
+    """Where a heat added by hand gets its lanes: the run's widest track."""
+    tracks = _round_tracks(session, rnd, _active_tracks_or_error(session, event))
+    return max(tracks, key=lambda t: (len(t.usable_lanes), -t.id))
+
+
+def _edit_choices(session: Session, rnd: Round, heat_lanes: dict[int, list[HeatLane]]) -> dict[int, dict[str, Any]]:
+    """Cars that may go in this run's heats: the den's racing scouts (or the
+    runoff's/final's own entries), plus anyone already in it."""
+    ids = set(_round_members(session, rnd, den_entries(session, rnd.event_id)))
+    ids |= {hl.entry_id for ls in heat_lanes.values() for hl in ls if hl.entry_id}
+    info = entry_info(session, ids)
+    return dict(sorted(info.items(), key=lambda kv: kv[1]["number"]))
+
+
+def heat_editor(session: Session, event: Event, rnd: Round) -> dict[str, Any]:
+    """Everything the heat editor page shows for one run."""
+    heats = list(session.exec(select(Heat).where(Heat.round_id == rnd.id, Heat.status != HeatStatus.rerun).order_by(Heat.seq)))
+    lanes = views.lanes_for(session, [h.id for h in heats])
+    choices = _edit_choices(session, rnd, lanes)
+    tracks = {t.id: t for t in session.exec(select(Track).where(Track.event_id == event.id))}
+    new_track = _new_heat_track(session, event, rnd)
+    rows = [
+        {
+            "heat": h,
+            "editable": _editable(h),
+            "track": tracks.get(h.track_id),
+            "lanes": {hl.lane: hl.entry_id for hl in lanes[h.id]},
+        }
+        for h in heats
+    ]
+    return {
+        "rows": rows,
+        "choices": choices,
+        "lane_numbers": sorted({l for r in rows for l in r["lanes"]} | set(new_track.usable_lanes)),
+        "new_lanes": new_track.usable_lanes,
+        "target": rnd.races,
+        "version": ",".join(str(r["heat"].id) for r in rows if r["editable"]),
+    }
+
+
+def save_heat_lineups(
+    session: Session, event: Event, rnd: Round, version: str, rows: list[tuple[str, dict[int, int | None]]], actor: Actor
+) -> dict[str, int]:
+    """Replace a run's unraced heats with a hand-edited lineup.
+
+    ``rows`` is the new queue order: (heat id, or "new" for an added heat,
+    {lane: entry id or None}). A heat left with no cars is deleted. Raced
+    heats aren't touched. ``version`` lists the unraced heat ids the editor
+    was showing; if a heat was staged or the run rebuilt since, nothing is
+    saved.
+    """
+    heats = list(session.exec(select(Heat).where(Heat.round_id == rnd.id).order_by(Heat.seq)))
+    editable = {h.id: h for h in heats if _editable(h)}
+    shown = {int(x) for x in version.split(",") if x}
+    if shown != set(editable):
+        raise ServiceError("These heats changed while you were editing (one may have been staged). Nothing was saved; check them and try again.", 409)
+    lanes = views.lanes_for(session, list(editable))
+    choices = _edit_choices(session, rnd, lanes)
+    new_lanes = _new_heat_track(session, event, rnd).usable_lanes if any(k == "new" for k, _ in rows) else []
+
+    seen: set[int] = set()
+    plan: list[tuple[Heat | None, dict[int, int | None]]] = []
+    for pos, (key, lineup) in enumerate(rows, start=1):
+        heat = None if key == "new" else editable.get(int(key))
+        if (key != "new" and heat is None) or (heat is not None and heat.id in seen):
+            raise ServiceError("Unknown heat in the list. Reload and try again.")
+        allowed = {hl.lane for hl in lanes[heat.id]} if heat else set(new_lanes)
+        if set(lineup) - allowed:
+            raise ServiceError(f"Row {pos}: lane {min(set(lineup) - allowed)} isn't on that heat's track.")
+        cars = [e for e in lineup.values() if e is not None]
+        if any(e not in choices for e in cars):
+            raise ServiceError(f"Row {pos}: that car isn't in this run.")
+        if dup := [e for e, n in Counter(cars).items() if n > 1]:
+            raise ServiceError(f"Row {pos}: #{choices[dup[0]]['number']} is in two lanes of the same heat.")
+        if heat:
+            seen.add(heat.id)
+        if cars or heat:
+            plan.append((heat, {l: lineup.get(l) for l in sorted(allowed)}))
+    if seen != set(editable):
+        raise ServiceError("A heat is missing from the list. Reload and try again.")
+
+    def snapshot(hs: list[tuple[int, dict[int, int | None]]]) -> list[dict[str, Any]]:
+        return [{"heat": n, "lanes": {str(l): choices[e]["number"] for l, e in ls.items() if e}} for n, ls in hs]
+
+    before = snapshot([(h.number, {hl.lane: hl.entry_id for hl in lanes[h.id]}) for h in editable.values()])
+    slots = sorted(h.seq for h in editable.values())
+    top = max((h.seq for h in heats), default=0.0)
+    base_num = max((h.number for h in heats if h.id not in editable), default=0)
+    track = _new_heat_track(session, event, rnd) if new_lanes else None
+    after, removed, added, n = [], 0, 0, 0
+    for heat, lineup in plan:
+        if not any(lineup.values()):  # emptied: drop it
+            session.exec(delete(HeatLane).where(HeatLane.heat_id == heat.id))
+            session.delete(heat)
+            removed += 1
+            continue
+        n += 1
+        seq = slots[n - 1] if n <= len(slots) else top + n - len(slots)
+        if heat is None:
+            heat = Heat(round_id=rnd.id, track_id=track.id, seq=seq, number=base_num + n)
+            session.add(heat)
+            session.flush()
+            for lane, e in lineup.items():
+                session.add(HeatLane(heat_id=heat.id, lane=lane, entry_id=e))
+            added += 1
+        else:
+            heat.seq, heat.number = seq, base_num + n
+            session.add(heat)
+            for hl in lanes[heat.id]:
+                if hl.entry_id != lineup[hl.lane]:
+                    hl.entry_id = lineup[hl.lane]
+                    session.add(hl)
+        after.append((heat.number, lineup))
+    session.flush()
+    audit(session, actor, "schedule.edit_heats", "round", rnd.id, before={"heats": before}, after={"heats": snapshot(after)})
+    return {"heats": n, "removed": removed, "added": added}
 
 
 # --- projected end time ------------------------------------------------------
