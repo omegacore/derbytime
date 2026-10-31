@@ -426,7 +426,11 @@ def test_admin_event_setup_end_to_end(app, admin):
     ev_url = r.headers["location"].split("?")[0]
     ev_id = int(ev_url.rsplit("/", 1)[1])
     csv = "first_name,last_name,den\n" + "\n".join(f"Kid{i},X,Lion Den" for i in range(6))
-    r = admin.post(f"/admin/event/{ev_id}/import", data={"csv_text": csv, "checked_in": "on"}, follow_redirects=False)
+    r = admin.post(f"/admin/event/{ev_id}/import", data={"csv_text": csv, "checked_in": "on"})
+    assert "Roster import preview" in r.text and "6</strong> new entries" in r.text  # nothing written yet
+    with Session(app.state.engine) as sess:
+        assert not sess.exec(select(Entry).where(Entry.event_id == ev_id)).first()
+    r = admin.post(f"/admin/event/{ev_id}/import", data={"csv_text": csv, "checked_in": "on", "apply": "1"}, follow_redirects=False)
     assert "Imported" in r.headers["location"]
     r = admin.post(f"/admin/event/{ev_id}/schedule", follow_redirects=False)
     assert "generated" in r.headers["location"]
@@ -600,7 +604,7 @@ def test_admin_regenerate_and_lane_switches(app, admin):
 
 def test_out_of_date_warning_after_late_checkin(app, admin):
     t = track(app, "derby")
-    r = admin.post(f"/admin/event/{t.event_id}/import", data={"csv_text": "first_name,last_name,den\nLate,Kid,Wolf Den 3", "checked_in": "on"})
+    r = admin.post(f"/admin/event/{t.event_id}/import", data={"csv_text": "first_name,last_name,den\nLate,Kid,Wolf Den 3", "checked_in": "on", "apply": "1"})
     page = admin.get(f"/admin/event/{t.event_id}").text
     assert "The schedule is out of date" in page and "Late Kid" in page
     admin.post(f"/admin/event/{t.event_id}/regenerate")

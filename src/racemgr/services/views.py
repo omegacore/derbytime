@@ -63,6 +63,8 @@ def entry_info(session: Session, entry_ids: set[int]) -> dict[int, dict[str, Any
             "racer_id": r.id,
             "racer_name": r.display_name,
             "group": g.name if g else "",
+            "status": e.status.value if e.status else None,
+            "status_reason": e.status_reason or "",
         }
         for e, r, g in rows
     }

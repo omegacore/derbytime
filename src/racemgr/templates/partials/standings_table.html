@@ -16,7 +16,8 @@
       <td class="num"><span class="rank">{{ row.s.rank if row.s.score is not none else "–" }}</span>{% if row.s.tied %}<span class="flag" title="tied">=</span>{% endif %}</td>
       {% if board %}<td class="col-car">{% if row.photo_url %}<img src="{{ row.photo_url }}" alt="">{% else %}{{ vehicle_glyph(event.type.value) }}{% endif %}</td>{% endif %}
       <td><strong>#{{ row.number }}</strong> <a href="/racer/{{ row.racer_id }}">{{ row.racer_name }}</a>
-          {% if row.car_name %}<span class="muted small hide-sm">· {{ row.car_name }}</span>{% endif %}</td>
+          {% if row.car_name %}<span class="muted small hide-sm">· {{ row.car_name }}</span>{% endif %}
+          {% if row.status %}<span class="badge">{{ row.status }}</span>{% endif %}</td>
       <td class="hide-sm muted col-den">{{ row.group }}</td>
       {% if event.scoring_mode.value == 'points' %}<td class="num">{{ row.s.points }}</td>{% endif %}
       <td class="num">{{ row.s.average | t }}</td>
@@ -27,3 +28,4 @@
   </tbody>
 </table>
 </div>
+{% if block.disqualified %}<p class="small muted dq-list">Disqualified: {% for d in block.disqualified %}#{{ d.number }} {{ d.racer_name }}{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}

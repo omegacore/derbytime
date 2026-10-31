@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Roster{% endblock %}
+{% block content %}
+<p class="small"><a href="/admin">← Admin</a></p>
+<div class="row spread">
+  <h1>Pack roster</h1>
+  <a class="btn" href="/admin/roster.csv">Download roster CSV</a>
+</div>
+<p class="small muted">Every scout the pack has imported, shared by all events. Inactive scouts aren't scheduled; a roster import that lists them as Active again brings them back. Edit a scout to fix a name or den, set a Member ID, merge a duplicate, or withdraw or disqualify them in an event.</p>
+
+<section class="card">
+  <input id="roster-q" type="search" placeholder="Search name, den or Member ID" style="width:100%" autocomplete="off">
+  <div class="table-wrap" style="margin-top:8px">
+  <table id="roster-table">
+    <thead><tr><th>Scout</th><th>Den</th><th class="hide-sm">Member ID</th><th>Events</th><th></th></tr></thead>
+    <tbody>
+    {% for r, g in rows %}
+      <tr data-q="{{ (r.display_name ~ ' ' ~ (g.name if g else '') ~ ' ' ~ (r.member_id or '')) | lower }}"{% if not r.active %} class="muted"{% endif %}>
+        <td><a href="/admin/racer/{{ r.id }}">{{ r.display_name }}</a>{% if not r.active %} <span class="badge">inactive</span>{% endif %}</td>
+        <td class="small">{{ g.name if g else '' }}</td>
+        <td class="small hide-sm">{{ r.member_id or '' }}</td>
+        <td class="small">{% for e, ev in entries.get(r.id, []) %}<div>{{ ev.name }} #{{ e.number }}{% if e.status %} <span class="badge bad">{{ e.status.value }}</span>{% endif %}</div>{% endfor %}</td>
+        <td><a class="small" href="/admin/racer/{{ r.id }}">Edit</a></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5" class="muted">No scouts yet. Import a roster on an event's admin page, or add one below.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Add a scout</h2>
+  <form class="row" method="post" action="/admin/racers">
+    <input name="first_name" placeholder="First name" required>
+    <input name="last_name" placeholder="Last name">
+    <input name="den" placeholder="Den" list="den-list" required>
+    <input name="member_id" placeholder="Member ID (optional)">
+    <button class="primary" type="submit">Add</button>
+  </form>
+  <datalist id="den-list">{% for d in dens %}<option value="{{ d }}">{% endfor %}</datalist>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const q = document.getElementById("roster-q");
+  const rows = [...document.querySelectorAll("#roster-table tbody tr[data-q]")];
+  q.addEventListener("input", () => {
+    const words = q.value.toLowerCase().split(/\s+/).filter(Boolean);
+    for (const tr of rows) tr.hidden = !words.every((w) => tr.dataset.q.includes(w));
+  });
+})();
+</script>
+{% endblock %}

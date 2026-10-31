@@ -32,7 +32,6 @@ from ..models import (
 from ..services import ServiceError
 from ..services.audit import audit
 from ..services.race import RaceService
-from ..services.roster import import_csv
 from ..services.schedule import (
     add_pass,
     clear_schedule,
@@ -122,6 +121,7 @@ def admin_event(event_id: int, request: Request, s: Session = Depends(get_sessio
             "event": ev,
             "tracks": tracks,
             "entries": entries,
+            "out_count": sum(1 for e, r, _ in entries if e.status or not r.active),
             "heat_counts": heat_counts,
             "has_schedule": bool(rounds),
             "standings": event_standings(s, ev) if rounds else [],
@@ -158,26 +158,6 @@ async def admin_event_settings(event_id: int, request: Request, s: Session = Dep
     s.commit()
     await rs.sync_timers()
     return back(url, "Saved.")
-
-
-@router.post("/event/{event_id}/import")
-async def admin_import(event_id: int, request: Request, s: Session = Depends(get_session), me=Depends(get_official)):
-    admin_only(me)
-    ev = get_event(s, event_id)
-    f = await form(request)
-    text = f.get("csv_text") or ""
-    upload = f.get("csv_file")
-    if upload is not None and hasattr(upload, "read"):
-        data = await upload.read()
-        if data:
-            text = data.decode("utf-8-sig", errors="replace")
-    try:
-        result = import_csv(s, ev, text, auth.actor_for(me), checked_in=f.get("checked_in") == "on")
-        s.commit()
-    except ServiceError as e:
-        s.rollback()
-        return back(f"/admin/event/{ev.id}", e.message, True)
-    return back(f"/admin/event/{ev.id}", result.message)
 
 
 @router.post("/event/{event_id}/tracks")

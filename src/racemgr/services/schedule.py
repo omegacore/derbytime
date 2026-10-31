@@ -20,6 +20,7 @@ from ..models import (
     ACTIVE,
     ON_TRACK,
     Entry,
+    EntryStatus,
     Event,
     EventStatus,
     Group,
@@ -50,8 +51,25 @@ def eligible_entries(session: Session, event_id: int) -> list[tuple[Entry, Racer
                 Entry.event_id == event_id,
                 Entry.checked_in == True,  # noqa: E712
                 Entry.inspection_status != InspectionStatus.failed,
+                col(Entry.status).is_(None),
+                col(Racer.inactive_since).is_(None),
             )
             .order_by(Entry.number)
+        )
+    )
+
+
+def entries_with_status(session: Session, event_id: int, *statuses: EntryStatus) -> set[int]:
+    return set(session.exec(select(Entry.id).where(Entry.event_id == event_id, col(Entry.status).in_(statuses))))
+
+
+def out_of_race(session: Session, event_id: int) -> set[int]:
+    """Entries that race no more: withdrawn, disqualified, or the scout went inactive."""
+    return entries_with_status(session, event_id, *EntryStatus) | set(
+        session.exec(
+            select(Entry.id)
+            .join(Racer, Racer.id == Entry.racer_id)
+            .where(Entry.event_id == event_id, col(Racer.inactive_since).is_not(None))
         )
     )
 
@@ -176,14 +194,16 @@ def _build_round_heats(
 def _round_members(session: Session, rnd: Round, den_map: dict[int | None, list[int]]) -> list[int]:
     if rnd.kind == RoundKind.group:
         return list(den_map.get(rnd.group_id, []))
-    # runoffs and finals keep the entries they were created with
+    # runoffs and finals keep the entries they were created with (less any
+    # that have been withdrawn or disqualified since)
+    out = out_of_race(session, rnd.event_id)
     rows = session.exec(
         select(HeatLane.entry_id, Entry.number)
         .join(Heat, Heat.id == HeatLane.heat_id)
         .join(Entry, Entry.id == HeatLane.entry_id)
         .where(Heat.round_id == rnd.id, Heat.status != HeatStatus.rerun)
     ).all()
-    return [e for e, _ in sorted(set(rows), key=lambda r: r[1])]
+    return [e for e, _ in sorted(set(rows), key=lambda r: r[1]) if e not in out]
 
 
 def _new_run(session: Session, event: Event, group_id: int | None, n: int, seq: int) -> Round:
@@ -501,7 +521,10 @@ def round_progress(session: Session, round_id: int) -> tuple[int, int]:
     return sum(1 for s in statuses if s == HeatStatus.approved), len(statuses)
 
 
-def round_runs(session: Session, round_ids: list[int]) -> tuple[list[scoring.RunResult[int]], set[int]]:
+def round_runs(session: Session, round_ids: list[int], exclude: set[int] = frozenset()) -> tuple[list[scoring.RunResult[int]], set[int]]:
+    """Approved runs of the rounds, and every entry in them. ``exclude``
+    (disqualified entries) leaves entries out of the ranking; heat places and
+    points of the others stay as raced."""
     rows = session.exec(
         select(HeatLane, Heat)
         .join(Heat, Heat.id == HeatLane.heat_id)
@@ -509,16 +532,17 @@ def round_runs(session: Session, round_ids: list[int]) -> tuple[list[scoring.Run
     ).all()
     entries: set[int] = set()
     by_heat: dict[int, list[HeatLane]] = defaultdict(list)
+    fields = Counter(heat.id for hl, heat in rows if hl.entry_id is not None)
     for hl, heat in rows:
-        if hl.entry_id is None:
+        if hl.entry_id is None or hl.entry_id in exclude:
             continue
         if heat.status != HeatStatus.rerun:
             entries.add(hl.entry_id)
         if heat.status == HeatStatus.approved:
             by_heat[heat.id].append(hl)
     runs = []
-    for lanes in by_heat.values():
-        field = len(lanes)
+    for heat_id, lanes in by_heat.items():
+        field = fields[heat_id]
         for hl in lanes:
             runs.append(scoring.RunResult(hl.entry_id, None if hl.dnf else hl.final_time, hl.place or field, field))
     return runs, entries
@@ -536,14 +560,17 @@ def _runoffs_for(session: Session, rounds: list[Round]) -> list[Round]:
     return list(session.exec(select(Round).where(col(Round.parent_round_id).in_(ids)).order_by(Round.id)))
 
 
-def round_standings(session: Session, rnd: Round, event: Event) -> list[scoring.Standing[int]]:
-    """Standings for ``rnd``'s den (all passes) or final, with runoffs breaking ties."""
+def round_standings(session: Session, rnd: Round, event: Event, exclude: set[int] | None = None) -> list[scoring.Standing[int]]:
+    """Standings for ``rnd``'s den (all passes) or final, with runoffs breaking
+    ties. Disqualified entries are left out unless ``exclude`` says otherwise."""
+    if exclude is None:
+        exclude = entries_with_status(session, event.id, EntryStatus.disqualified)
     rounds = scoring_rounds(session, rnd)
-    runs, entries = round_runs(session, [r.id for r in rounds])
+    runs, entries = round_runs(session, [r.id for r in rounds], exclude)
     tiebreak: dict[int, int] = {}
     offset = 0
     for ro in _runoffs_for(session, rounds):
-        ro_runs, ro_entries = round_runs(session, [ro.id])
+        ro_runs, ro_entries = round_runs(session, [ro.id], exclude)
         ro_st = scoring.compute_standings(ro_runs, event.scoring_mode.value, event.dnf_time, entries=sorted(ro_entries))
         for eid, rank in scoring.runoff_order(ro_st).items():
             tiebreak[eid] = offset + rank
@@ -571,12 +598,15 @@ def event_standings(session: Session, event: Event) -> list[dict[str, Any]]:
         key=lambda r: scheduler.natural_key(den_name(session, r.group_id)),
     )
     finals = session.exec(select(Round).where(Round.event_id == event.id, Round.kind == RoundKind.final).order_by(Round.seq)).all()
+    dq = entries_with_status(session, event.id, EntryStatus.disqualified)
+    gone = dq | entries_with_status(session, event.id, EntryStatus.withdrawn)
     for rnd in [*groups, *finals]:
         if (rnd.kind, rnd.group_id) in seen:
             continue
         seen.add((rnd.kind, rnd.group_id))
-        st = round_standings(session, rnd, event)
-        info = entry_info(session, {s.entry_id for s in st})
+        st = round_standings(session, rnd, event, dq)
+        dq_here = round_runs(session, [r.id for r in scoring_rounds(session, rnd)])[1] & dq if dq else set()
+        info = entry_info(session, {s.entry_id for s in st} | dq_here)
         approved, total = den_progress(session, rnd, with_runoffs=False)
         cutoff = event.finalists_per_group if rnd.kind == RoundKind.group else 3
         complete = total > 0 and approved == total
@@ -588,18 +618,29 @@ def event_standings(session: Session, event: Event) -> list[dict[str, Any]]:
                 "total": total,
                 "complete": complete,
                 "rows": [{"s": s, **info[s.entry_id]} for s in st],
-                # only offer runoffs once a den has finished every pass
-                "ties": [[info[e] for e in block] for block in scoring.tie_blocks(st, cutoff)] if complete else [],
+                "disqualified": sorted((info[e] for e in dq_here), key=lambda i: i["number"]),
+                # only offer runoffs once a den has finished every pass, and
+                # only between scouts still racing
+                "ties": [[info[e] for e in block] for block in scoring.tie_blocks(still_racing(session, rnd, event, st, gone), cutoff)] if complete else [],
                 "cutoff": cutoff,
             }
         )
     return out
 
 
+def still_racing(session: Session, rnd: Round, event: Event, st: list[scoring.Standing[int]], gone: set[int]) -> list[scoring.Standing[int]]:
+    """Standings re-ranked without withdrawn (and disqualified) entries, for
+    finalist and runoff decisions."""
+    if not gone & {s.entry_id for s in st}:
+        return st
+    return round_standings(session, rnd, event, gone)
+
+
 def pack_standings(session: Session, event: Event) -> dict[str, Any]:
     """Every den's runs pooled into one pack-wide ranking (no runoffs)."""
     runs_all = group_rounds(session, event.id)
-    runs, entries = round_runs(session, [r.id for r in runs_all]) if runs_all else ([], set())
+    dq = entries_with_status(session, event.id, EntryStatus.disqualified)
+    runs, entries = round_runs(session, [r.id for r in runs_all], dq) if runs_all else ([], set())
     st = scoring.compute_standings(runs, event.scoring_mode.value, event.dnf_time, entries=sorted(entries))
     info = entry_info(session, {s.entry_id for s in st})
     approved = total = 0
@@ -648,11 +689,13 @@ def create_final(session: Session, event: Event, track_id: int | None, actor: Ac
     if not blocks:
         raise ServiceError("Generate the den rounds first.")
     finalists: list[int] = []
+    gone = entries_with_status(session, event.id, *EntryStatus)
     for b in blocks:
         approved, total = den_progress(session, b["round"])
         if approved != total:
             raise ServiceError(f"{b['name']}: {total - approved} heat(s) not approved yet.")
-        pick = scoring.select_finalists([row["s"] for row in b["rows"]], event.finalists_per_group)
+        st = still_racing(session, b["round"], event, [row["s"] for row in b["rows"]], gone)
+        pick = scoring.select_finalists(st, event.finalists_per_group)
         if pick.blocking_tie:
             nums = ", ".join(f"#{i['number']}" for i in entry_info(session, set(pick.blocking_tie)).values())
             raise ServiceError(f"{b['name']}: tie at the finalist cutoff ({nums}). Run a runoff first.")

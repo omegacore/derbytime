@@ -124,10 +124,17 @@ Lookup order for the config file: `--config PATH`, then `$RACEMGR_CONFIG`, then 
    | --- | --- |
    | `Scout First Name` | required |
    | `Scout Last Name` | |
+   | `Member ID` | stored; re-imports match scouts on it, so a den move or a name fix updates the scout instead of creating a duplicate |
    | `Den` | each den gets its own runs; den names must match exactly |
-   | `Status` | only rows marked `Active` are imported (others are skipped and counted). A file without this column imports every row. |
+   | `Status` | only rows marked `Active` race (others are skipped and counted). A file without this column treats every row as Active. |
 
-   Every other column (Member ID, School, parent names/emails/phones/addresses, DOB, dues, notes, …) is ignored and never stored. Car/boat numbers are assigned automatically (an optional `number` column overrides). Scouts and dens are pack-wide, so importing the same roster into the regatta reuses them.
+   Every other column (School, parent names/emails/phones/addresses, DOB, dues, notes, …) is ignored and never stored. Car/boat numbers are assigned automatically (an optional `number` column overrides). Scouts and dens are pack-wide, so importing the same roster into the regatta reuses them.
+
+   **Every import shows a preview first** (new scouts, updates, now inactive, unchanged, skipped) and changes nothing until you press *Apply import*. Importing a newer export later is a sync:
+   - Scouts are matched by Member ID. Without one, they're matched by name and den, or by name alone when only one scout has that name (a den move). A legacy scout matched that way gets the file's Member ID.
+   - A scout no longer `Active` is marked **inactive**: they stop being scheduled in every event, and their results so far stay. A later roster listing them as Active brings them back.
+   - Nobody is ever deleted by an import. Scouts in the event but missing from the file are listed in the preview so you can deal with them.
+   - Imports and roster edits don't touch a running schedule by themselves. The event page shows *The schedule is out of date* until you regenerate.
 2. **Check-in** (`/checkin`): mark scouts checked in, record weight and pass/fail inspection. Only checked-in entries that haven't failed inspection are scheduled. You can also tick "mark checked in" on import.
 3. **Schedule**: on the event's admin page, *Generate schedule* gives every den **runs**. A run is one full lane rotation: every car runs every lane once. The number of runs per den is set on that form (default `passes_per_den = 2` in config).
    - **Default order:** dens are sorted by name with numbers compared numerically (Den 2 before Den 10). The order snakes down the list and back up, e.g. Den 1, Den 2, Den 3, Den 3 · run 2, Den 2 · run 2, Den 1 · run 2.
@@ -152,6 +159,37 @@ Lookup order for the config file: `--config PATH`, then `$RACEMGR_CONFIG`, then 
    - Head timekeeper (`/timekeeper`): approve, edit (reason required) or re-run. Times outside the track's min/max are flagged. A re-run goes to the front of the shared queue.
    - **Re-run reasons:** pick one from a dropdown (or *Other…* to type one). The lists are per event type in `config.toml` (`rerun_reasons`).
 6. **Ties and finals**: tied scores at a den's finalist cutoff (or within the top 3 of the final) show an *Add runoff* button. The runoff's result breaks the tie. *Create final* takes the top N per den (set per event).
+7. **Race-day issues: withdraw or disqualify.** On the event's admin page, open *Show entries* and tap the scout (or use `/admin/roster`). Each entry has a *Race status* form, and a reason is required:
+
+   | | Results raced so far | Rankings | Finals and runoffs | Remaining heats |
+   | --- | --- | --- | --- | --- |
+   | **Withdraw** (went home, car broke) | kept | still ranked, marked *withdrawn* | skipped; the next scout moves up | dropped |
+   | **Disqualify** | kept on record (heats, CSV export, audit log) | removed; listed as *Disqualified* under the den | skipped; the next scout moves up | dropped |
+
+   - Unraced heats are rescheduled right away, including any final or runoff the car was in. A heat already on the track or awaiting approval finishes as normal.
+   - Other cars' heat places and points stay as they were raced. A disqualification doesn't re-place the heats it was in.
+   - *Reinstate* undoes either one: the car is scheduled again for the heats still to race.
+   - The public racer page shows the status but not the reason.
+   - *Remove from this event* deletes an entry outright, but only before the car has raced.
+
+### Roster admin
+
+`/admin/roster` lists every scout in the pack: search, add a scout, and download the roster CSV. A scout's page (`/admin/racer/{id}`) lets you:
+- fix the name or den, set the Member ID, or mark the scout active or inactive
+- edit each entry's car number and car name, withdraw, disqualify or reinstate, or remove an entry that hasn't raced
+- enter the scout in another event (a late registration)
+- merge a duplicate into the right scout (their entries move over), or delete a scout with no entries
+
+Every change is in the audit log.
+
+### Backup and export
+
+- **Full backup:** *Download backup* on `/admin`, or `racemgr backup [PATH]` from the command line. Both make a consistent copy of the whole SQLite database (every event, scout, result, official and the audit log), and both are safe while the server is running. Copies are also kept in `<data_dir>/backups/`. To restore: stop the server, delete `racemgr.db-wal` and `racemgr.db-shm`, and copy the backup over `racemgr.db`.
+- **CSV exports** for spreadsheets, linked at the top of each event's admin page:
+  - *entries*: the roster plus car number and name, check-in, weight, inspection, and race status. It uses the importer's column names, so it imports back cleanly.
+  - *standings*: every den, the final and the pack overall, with disqualified scouts listed as `DQ`.
+  - *every heat*: every lane of every heat, re-runs included, with raw and final times, places, edit reasons and timestamps.
+- `/admin/roster.csv` exports the whole pack roster.
 
 Displays for a projector or TV: `/display/ondeck/{track}` and `/display/standings` (add `?event=ID` to limit it to one event). Families use `/`: search, schedule and results, and **☆ Follow**. Follows are stored on the phone. Alerts fire at "2 heats away", "on deck", "racing now" and "results posted" as an in-page banner with a beep and vibration (sound needs one tap on the page first, a browser rule).
 
@@ -210,7 +248,7 @@ python tools/loadtest.py run --url http://SERVER-IP:8765 --plan lt/plan.json   #
 
 `--viewers`, `--heats` and `--gap` (seconds per official step; 8 is about one real heat a minute) scale it up. `--gap 1` is a useful stress test. Run it from a laptop on the event Wi-Fi to test the network as well as the server.
 
-The database schema is created with `create_all`. Until migrations (Alembic) arrive, delete the `.db` file after schema changes during development.
+The database schema is created with `create_all`. New nullable columns (and their indexes) are added to an existing database at startup. Until migrations (Alembic) arrive, any other schema change means deleting the `.db` file during development.
 
 ## Roadmap
 

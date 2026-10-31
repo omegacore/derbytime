@@ -88,11 +88,12 @@ def create_app(settings: Settings, engine: Engine | None = None, print_admin_lin
         title = "Not your page" if exc.status == 403 else "Sorry"
         return render(request, "message.html", {"title": title, "message": exc.message, "denied": exc.status == 403}, exc.status)
 
-    from .routes import admin, api, pages
+    from .routes import admin, api, pages, roster
 
     app.include_router(pages.router)
     app.include_router(api.router)
     app.include_router(admin.router)
+    app.include_router(roster.router)
 
     @app.websocket("/ws")
     async def websocket(ws: WebSocket):

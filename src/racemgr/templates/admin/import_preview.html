@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Import preview · {{ event.name }}{% endblock %}
+{% macro rows_table(rows, show_changes=false) %}
+<div class="table-wrap"><table class="small">
+  <thead><tr><th>Line</th><th>Scout</th><th>Den</th>{% if show_changes %}<th>Change</th>{% endif %}<th>This event</th></tr></thead>
+  <tbody>{% for r in rows %}
+    <tr><td>{{ r.line }}</td><td>{{ r.name }}</td><td>{{ r.den }}</td>
+      {% if show_changes %}<td>{{ r.changes | join('; ') }}</td>{% endif %}
+      <td>{% if r.enter %}new entry{% if r.number %} #{{ r.number }}{% endif %}{% endif %}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% endmacro %}
+{% block content %}
+<p class="small"><a href="/admin/event/{{ event.id }}">← {{ event.name }}</a></p>
+<h1>Roster import preview</h1>
+{% set new = plan.of('new') %}{% set upd = plan.of('update') %}{% set react = plan.of('reactivate') %}{% set deact = plan.of('deactivate') %}
+{% set skip = plan.of('skip') %}{% set same = plan.of('same') %}
+
+<section class="card">
+  <p><strong>{{ plan.entering | length }}</strong> new entries in {{ event.name }} ·
+     <strong>{{ new | length }}</strong> new scouts ·
+     <strong>{{ upd | length }}</strong> updated ·
+     <strong>{{ react | length }}</strong> active again ·
+     <strong>{{ deact | length }}</strong> now inactive ·
+     {{ same | length }} unchanged ·
+     {{ skip | length }} not Active (skipped)</p>
+  {% if not plan.has_status %}<p class="small muted">The file has no Status column, so every row counts as Active.</p>{% endif %}
+  {% if not plan.changed %}<p class="msg ok">Nothing to change: the roster already matches this file.</p>{% endif %}
+  <form method="post" action="/admin/event/{{ event.id }}/import" class="row">
+    <textarea name="csv_text" hidden>{{ text }}</textarea>
+    <input type="hidden" name="apply" value="1">
+    {% if checked_in %}<input type="hidden" name="checked_in" value="on">{% endif %}
+    <button class="primary" type="submit" {% if not plan.changed %}disabled{% endif %}>Apply import</button>
+    <a class="btn" href="/admin/event/{{ event.id }}">Cancel</a>
+  </form>
+</section>
+
+{% if new %}<section class="card"><h2>New scouts</h2>{{ rows_table(new) }}</section>{% endif %}
+{% if upd %}<section class="card"><h2>Updated</h2><p class="small muted">Matched by Member ID, or by name when there is none.</p>{{ rows_table(upd, true) }}</section>{% endif %}
+{% if react %}<section class="card"><h2>Active again</h2>{{ rows_table(react, true) }}</section>{% endif %}
+{% if deact %}
+<section class="card">
+  <h2>Now inactive</h2>
+  <p class="small muted">These scouts stop being scheduled in every event (their results so far stay). Regenerate the schedule of an event in progress afterwards.</p>
+  {{ rows_table(deact, true) }}
+</section>
+{% endif %}
+{% set entering_existing = plan.entering | rejectattr('kind', 'equalto', 'new') | list %}
+{% if entering_existing %}<section class="card"><h2>Existing scouts entering this event</h2>{{ rows_table(entering_existing, true) }}</section>{% endif %}
+{% if plan.not_in_file %}
+<section class="card">
+  <h2>In this event but not in the file</h2>
+  <p class="small muted">Nothing happens to them. If they've left, mark them inactive or withdraw them from the roster page.</p>
+  <p class="small">{{ plan.not_in_file | join(', ') }}</p>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% block title %}{{ event.name }} · admin{% endblock %}
 {% block content %}
-<p class="small"><a href="/admin">← Admin</a> · <a href="/event/{{ event.id }}">public page</a> · <a href="/display/standings?event={{ event.id }}">standings display</a></p>
+<p class="small"><a href="/admin">← Admin</a> · <a href="/event/{{ event.id }}">public page</a> · <a href="/display/standings?event={{ event.id }}">standings display</a> · <a href="/admin/roster">pack roster</a></p>
+<p class="small">Export CSV: <a href="/admin/event/{{ event.id }}/export/roster.csv">entries</a> · <a href="/admin/event/{{ event.id }}/export/standings.csv">standings</a> · <a href="/admin/event/{{ event.id }}/export/heats.csv">every heat</a></p>
 <h1>{{ event.name }}</h1>
 
 <section class="card">
@@ -63,19 +64,21 @@
 <section class="card">
   <h2>Roster <span class="muted small">({{ entries|length }} entries)</span></h2>
   <form class="stack" method="post" action="/admin/event/{{ event.id }}/import" enctype="multipart/form-data">
-    <p class="small muted">Upload the pack roster export (CSV or tab-separated). Only <strong>Scout First Name</strong>, <strong>Scout Last Name</strong> and <strong>Den</strong> are used, and only rows whose <strong>Status</strong> is Active are imported; parent contacts, Member ID, dues and other columns are ignored and not stored. Car numbers are assigned automatically. Scouts are shared across events, so importing the same roster into the regatta reuses them.</p>
+    <p class="small muted">Upload the pack roster export (CSV or tab-separated). Only <strong>Scout First Name</strong>, <strong>Scout Last Name</strong>, <strong>Member ID</strong>, <strong>Den</strong> and <strong>Status</strong> are used; parent contacts, dues and other columns are ignored and not stored. You see a preview before anything changes. Re-importing a newer export updates the roster: scouts are matched by Member ID, so den moves and name fixes update them, and scouts no longer Active are marked inactive. Car numbers are assigned automatically. Scouts are shared across events, so importing the same roster into the regatta reuses them.</p>
     <input type="file" name="csv_file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values">
     <textarea name="csv_text" rows="4" placeholder="…or paste the roster here (copying rows straight from the spreadsheet works)"></textarea>
     <label><input type="checkbox" name="checked_in"> Mark imported racers as checked in</label>
     <div><button type="submit">Import</button></div>
   </form>
   {% if entries %}
-  <details style="margin-top:12px"><summary>Show entries</summary>
+  <details style="margin-top:12px" {% if out_count %}open{% endif %}><summary>Show entries{% if out_count %} ({{ out_count }} withdrawn, disqualified or inactive){% endif %}</summary>
+    <p class="small muted">Tap a scout to edit their car number or name, or to <strong>withdraw</strong> or <strong>disqualify</strong> them. Their unraced heats are rescheduled right away.</p>
     <div class="table-wrap"><table>
-      <thead><tr><th class="num">#</th><th>Racer</th><th>Den</th><th>Checked in</th><th>Inspection</th></tr></thead>
+      <thead><tr><th class="num">#</th><th>Racer</th><th>Den</th><th>Checked in</th><th>Inspection</th><th>Status</th></tr></thead>
       <tbody>{% for e, r, g in entries %}
-        <tr><td class="num">{{ e.number }}</td><td>{{ r.display_name }}{% if e.name %} <span class="muted small">· {{ e.name }}</span>{% endif %}</td><td class="small">{{ g.name if g else '' }}</td>
-        <td>{{ '✓' if e.checked_in else '' }}</td><td class="small">{{ e.inspection_status.value }}</td></tr>
+        <tr><td class="num">{{ e.number }}</td><td><a href="/admin/racer/{{ r.id }}?next=/admin/event/{{ event.id }}">{{ r.display_name }}</a>{% if e.name %} <span class="muted small">· {{ e.name }}</span>{% endif %}</td><td class="small">{{ g.name if g else '' }}</td>
+        <td>{{ '✓' if e.checked_in else '' }}</td><td class="small">{{ e.inspection_status.value }}</td>
+        <td class="small">{% if e.status %}<span class="badge bad" title="{{ e.status_reason or '' }}">{{ e.status.value }}</span>{% elif not r.active %}<span class="badge">inactive</span>{% endif %}</td></tr>
       {% endfor %}</tbody>
     </table></div>
   </details>
@@ -95,7 +98,7 @@
     <div class="msg err">
       <strong>The schedule is out of date.</strong>
       {% if problems.missing %}<div>Checked in but not scheduled: {{ problems.missing | join(', ') }}</div>{% endif %}
-      {% if problems.scratched %}<div>No longer checked in but still has heats: {{ problems.scratched | join(', ') }}</div>{% endif %}
+      {% if problems.scratched %}<div>No longer racing (not checked in, failed inspection, withdrawn or inactive) but still has heats: {{ problems.scratched | join(', ') }}</div>{% endif %}
     </div>
     {% endif %}
     {% if projection %}
@@ -148,6 +151,7 @@
     {% for block in standings %}
       <div style="border-bottom:1px solid var(--line);padding:8px 0">
         <div class="row spread"><strong>{{ block.name }}</strong><span class="small muted">{{ block.approved }}/{{ block.total }} heats approved</span></div>
+        {% if block.disqualified %}<div class="small"><span class="flag">Disqualified:</span> {% for d in block.disqualified %}#{{ d.number }} {{ d.racer_name }} ({{ d.status_reason }}){% if not loop.last %}, {% endif %}{% endfor %}</div>{% endif %}
         {% for tie in block.ties %}
           <form class="row small" method="post" action="/admin/event/{{ event.id }}/runoff" style="margin-top:6px">
             <span class="flag">Tie:</span> {% for t in tie %}#{{ t.number }} {{ t.racer_name }}{% if not loop.last %}, {% endif %}{% endfor %}
