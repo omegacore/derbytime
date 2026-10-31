@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Join as an official{% endblock %}
+{% block content %}
+<div class="card">
+  {% if problem %}
+    <h1>Can't join</h1>
+    <p>{{ problem }}</p>
+    {% if me %}<p><a class="btn primary" href="{{ my_home }}">Go to my page</a></p>{% endif %}
+  {% else %}
+    <h1>Join as {{ ROLE_LABELS[jt.role.value] }}</h1>
+    {% if jt.label %}<p><strong>{{ jt.label }}</strong></p>{% endif %}
+    {% if event %}<p>Event: <strong>{{ event.name }}</strong></p>{% endif %}
+    {% if track %}<p>Track: <strong>{{ track.name }}</strong>{% if jt.lane %} · Lane <strong>{{ jt.lane }}</strong>{% endif %}</p>{% endif %}
+    {% if me %}
+      <div class="msg err">This phone is already <strong>{{ my_role }}</strong>{% if my_scope %} ({{ my_scope }}){% endif %}. Joining replaces that role.</div>
+    {% endif %}
+    <p class="muted small">This phone will remember the role until the admin revokes it or you sign out.</p>
+    <form method="post" action="/join/{{ token }}">
+      <button class="primary" type="submit" style="width:100%">{{ 'Switch to this role' if me else 'Join on this device' }}</button>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% set cur = st.current %}
+{% set show = cur or st.last %}
+<p class="kiosk-title">{{ st.track.name }}</p>
+{% if show %}
+  <p class="kiosk-sub">
+    {% if cur %}{% if cur.status == 'armed' %}RACING{% else %}STAGED{% endif %}{% else %}LAST HEAT{% endif %}
+    · {{ show.round_name }} heat {{ show.number }}{% if show.is_rerun %} (re-run){% endif %}
+    {% if not cur and show.status == 'pending' %}· results pending{% endif %}
+  </p>
+  <div class="kiosk-lanes">
+  {% for l in show.lanes %}
+    <div class="kiosk-lane">
+      <div class="lane-no">{{ l.lane }}</div>
+      <div class="kiosk-who">{% if l.bye %}<span class="bye">—</span>{% else %}{% if l.photo_url %}<img src="{{ l.photo_url }}" alt="">{% endif %}<strong>#{{ l.number }}</strong> {{ l.racer_name }}{% endif %}</div>
+      <div class="time">{% if not cur and show.status == 'approved' and l.has_result %}{{ l.final_time | t(l.dnf) }}{% if l.place %} <span class="muted">P{{ l.place }}</span>{% endif %}{% endif %}</div>
+    </div>
+  {% endfor %}
+  </div>
+{% else %}
+  <p class="kiosk-sub">Waiting for the first heat</p>
+{% endif %}
+{% for h in st.upcoming %}
+  <p class="kiosk-next"><strong>{% if loop.first %}ON DECK{% else %}IN THE HOLE{% endif %}</strong> · {{ h.round_name }} heat {{ h.number }}:
+  {% for l in h.lanes if not l.bye %}<span style="margin-right:1.5vw">L{{ l.lane }} #{{ l.number }} {{ l.racer_name }}</span>{% endfor %}</p>
+{% endfor %}
+{% if not st.upcoming and not cur %}<p class="kiosk-next muted">No more heats queued.</p>{% endif %}

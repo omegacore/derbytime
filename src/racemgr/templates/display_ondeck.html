@@ -1,0 +1,5 @@
+{% extends "base.html" %}
+{% block title %}{{ track.name }}: on deck{% endblock %}
+{% block content %}
+<div data-live="track-{{ track.id }}" hx-get="/partials/ondeck/{{ track.id }}" hx-trigger="load, rm-load"></div>
+{% endblock %}

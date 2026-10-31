@@ -1,0 +1,83 @@
+# Scout Race Manager configuration.
+# Copy to ./config.toml (or pass --config PATH / set RACEMGR_CONFIG).
+# Events, tracks and rosters live in the database and are edited from /admin;
+# this file holds server settings, timer hardware settings, and the defaults
+# used when a new track or event is created.
+
+[server]
+host = "0.0.0.0"
+port = 8000
+db_path = "racemgr.db"          # SQLite file, relative to this config file
+data_dir = "data"               # serial logs, check-in photos
+# URL phones should use to reach the server, used in QR codes and the admin
+# link. Leave empty to auto-detect the LAN IP.
+public_base_url = ""
+
+[auth]
+join_token_minutes = 15         # how long an official's QR code stays valid
+admin_link_minutes = 1440       # how long the first-run admin link stays valid
+device_cookie_days = 30
+
+# Defaults applied when a track or event of each type is created.
+[defaults.derby]
+lane_count = 4
+timing_source = "simulator"     # simulator | microwizard | champ | arduino_gate
+scoring_mode = "average_time"   # average_time | best_time | points
+min_time = 2.0                  # results outside [min_time, max_time] are flagged
+max_time = 6.0
+dnf_time = 9.999                # time counted for a DNF when averaging
+finalists_per_group = 3
+passes_per_den = 2              # full lane rotations per den; order snakes down then back up
+# choices in the Re-run dropdown (operators can also pick "Other" and type one)
+rerun_reasons = [
+  "False start / start gate problem",
+  "Car jumped into another lane",
+  "Car left the track",
+  "Car broke or lost a wheel",
+  "Timer didn't record",
+  "Wrong car in lane",
+  "Interference on the track",
+]
+
+[defaults.regatta]
+lane_count = 2
+timing_source = "phone"
+scoring_mode = "best_time"
+min_time = 3.0
+max_time = 60.0
+dnf_time = 99.0
+finalists_per_group = 3
+passes_per_den = 2
+rerun_reasons = [
+  "False start",
+  "Boat tipped over or sank",
+  "Boat stuck or snagged",
+  "Boat crossed into the other lane",
+  "Lane official missed the start or finish",
+  "Wrong boat in lane",
+  "Interference (wind, hands, splashing)",
+]
+
+# Timer hardware / behaviour, keyed by timing_source name.
+[timers.simulator]
+delay_seconds = 3.0             # wait after arming before results arrive
+mean_time = 3.2
+spread = 0.25
+dnf_chance = 0.02
+outlier_chance = 0.03
+
+[timers.phone]
+# nothing to configure yet
+
+# USB serial timers (phase 2). Port names: COM3 on Windows, /dev/ttyUSB0 on the Pi.
+[timers.microwizard]
+port = ""
+baudrate = 9600
+
+[timers.champ]
+port = ""
+baudrate = 9600
+
+[timers.arduino_gate]
+port = ""
+baudrate = 115200

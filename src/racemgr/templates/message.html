@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ title }}</h1>
+  <p>{{ message }}</p>
+  {% if denied and me %}
+    <p>This phone is signed in as <strong>{{ my_role }}</strong>{% if my_scope %} ({{ my_scope }}){% endif %}.</p>
+    <p><a class="btn primary" href="{{ my_home }}">Go to my page</a></p>
+    <p class="small muted">Need a different job? Ask the admin for a new QR code. Scanning it switches this phone to the new role.</p>
+  {% elif denied %}
+    <p>Volunteers: scan the QR code the admin shows you for your job.</p>
+    <p><a href="/">Watch the race schedule and results instead</a></p>
+  {% else %}
+    <p><a href="{{ my_home if me else '/' }}">{{ 'Back to my page' if me else 'Back to the race schedule' }}</a></p>
+  {% endif %}
+</div>
+{% endblock %}

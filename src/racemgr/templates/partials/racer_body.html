@@ -1,0 +1,29 @@
+{% from "macros.html" import status_badge, lane_result %}
+{% for b in blocks %}
+<section class="card">
+  <div class="row spread">
+    <h2 style="margin:0">{{ b.event.name }}</h2>
+    <span><strong>#{{ b.entry.number }}</strong>{% if b.entry.name %} · {{ b.entry.name }}{% endif %}</span>
+  </div>
+  {% set photo = vehicle_photo(b.entry) %}
+  {% if photo %}<img class="vehicle-photo" src="{{ photo }}" alt="{{ 'Boat' if b.event.type.value == 'regatta' else 'Car' }} #{{ b.entry.number }}" loading="lazy">{% endif %}
+  {% if b.rank %}<p>Rank <strong>{{ b.rank[1] }}</strong> of {{ b.rank[2] }} in {{ b.rank[0] }}</p>{% endif %}
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Round</th><th>Heat</th><th>Track</th><th class="num">Lane</th><th class="num">Time</th><th></th></tr></thead>
+    <tbody>
+    {% for h in b.heats %}
+      <tr>
+        <td class="small">{{ h.round_name }}</td><td>{{ h.number }}</td><td class="small">{{ h.track_name }}</td>
+        <td class="num">{{ h.mine.lane }}</td>
+        <td class="num">{% if h.status == 'approved' %}{{ lane_result(h.mine) }}{% endif %}</td>
+        <td>{{ status_badge(h.status) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% else %}
+<p class="muted">Not entered in any events.</p>
+{% endfor %}

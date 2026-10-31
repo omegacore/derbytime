@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Choose a track{% endblock %}
+{% block content %}
+<h1>Choose a track to operate</h1>
+{% for ev, t in tracks %}
+  <a class="card row spread" href="/track/{{ t.id }}/operate" style="text-decoration:none;color:inherit;flex-wrap:nowrap">
+    <span style="min-width:0"><strong>{{ t.name }}</strong><br><span class="muted small">{{ ev.name }} · {{ t.lane_count }} lanes</span></span>
+    <span class="btn primary" style="flex-shrink:0">Operate →</span>
+  </a>
+{% else %}
+  <div class="card"><p class="muted">No active tracks. An event's tracks appear here once its schedule is generated.</p></div>
+{% endfor %}
+{% endblock %}

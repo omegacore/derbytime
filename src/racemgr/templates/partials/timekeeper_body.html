@@ -1,0 +1,55 @@
+{% from "macros.html" import heat_title, status_badge, racer_label, rerun_form %}
+<h2>Pending results <span class="muted small">({{ pending|length }})</span></h2>
+{% for h in pending %}
+<section class="card">
+  <div class="row spread">
+    <h3 style="margin:0">{{ h.track_name }}: {{ heat_title(h) }}</h3>
+    {% if h.flagged %}<span class="badge bad">⚑ outside expected range</span>{% endif %}
+  </div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Lane</th><th>Racer</th><th class="num">Time</th><th class="num">Place</th><th class="hide-sm">Source</th><th></th></tr></thead>
+    <tbody>
+    {% for l in h.lanes %}
+      <tr class="{% if l.outlier %}flagged{% endif %}">
+        <td>{{ l.lane }}</td>
+        <td>{{ racer_label(l) }}</td>
+        <td class="num">{% if not l.bye %}<strong>{{ l.final_time | t(l.dnf) }}</strong>
+          {% if l.raw_time is not none and l.final_time != l.raw_time %}<br><span class="muted small">raw {{ l.raw_time | t }}</span>{% endif %}
+          {% if l.edit_reason %}<br><span class="muted small">edited: {{ l.edit_reason }}</span>{% endif %}{% endif %}</td>
+        <td class="num">{{ l.place or '' }}</td>
+        <td class="hide-sm small muted">{{ l.source or '' }}</td>
+        <td>{% if not l.bye %}
+          <details>
+            <summary class="small">Edit</summary>
+            <form class="stack" hx-post="/api/heat/{{ h.id }}/edit" hx-swap="none" style="min-width:200px">
+              <input type="hidden" name="lane" value="{{ l.lane }}">
+              <label>New time <input name="time" inputmode="decimal" placeholder="3.123 or DNF" required autocomplete="off"></label>
+              <label>Reason (required) <input name="reason" required autocomplete="off"></label>
+              <div class="row"><button class="primary" type="submit">Save</button><button type="button" data-cancel>Cancel</button></div>
+            </form>
+          </details>
+        {% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <div class="row" style="margin-top:10px">
+    <button class="ok" hx-post="/api/heat/{{ h.id }}/approve" hx-swap="none">Approve</button>
+  </div>
+  <div style="margin-top:10px">{{ rerun_form(h) }}</div>
+</section>
+{% else %}
+<p class="muted">Nothing waiting for approval.</p>
+{% endfor %}
+
+<h2>On track now</h2>
+{% for h in on_track %}
+<div class="card">
+  <div class="row spread"><strong>{{ h.track_name }}: {{ heat_title(h) }}</strong>{{ status_badge(h.status) }}</div>
+  <div class="small">{% for l in h.lanes if not l.bye %}L{{ l.lane }} #{{ l.number }} {{ l.racer_name }}{% if l.has_result %} <strong>{{ l.final_time | t(l.dnf) }}</strong>{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</div>
+</div>
+{% else %}
+<p class="muted">No heats staged.</p>
+{% endfor %}

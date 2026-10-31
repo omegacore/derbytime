@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}{{ track.name }} lane {{ lane }}{% endblock %}
+{% block content %}
+<div class="row spread"><h1 style="margin:0">{{ track.name }} · Lane {{ lane }}</h1><span id="sw-wake" class="small muted"></span></div>
+<div id="lane-info" data-live="track-{{ track.id }}" hx-get="/partials/lane/{{ track.id }}/{{ lane }}" hx-trigger="load, rm-load"></div>
+<div id="stopwatch" class="sw" data-track="{{ track.id }}" data-lane="{{ lane }}">
+  <div id="sw-time" class="sw-time">0.00</div>
+  <button id="sw-big" class="sw-big wait" disabled>Waiting…</button>
+  <div class="sw-actions">
+    <button id="sw-resume" disabled>Resume</button>
+    <button id="sw-submit" class="primary" disabled>Submit</button>
+  </div>
+  <button id="sw-dnf" disabled>DNF (boat didn't finish)</button>
+  <p id="sw-status" class="sw-status muted"></p>
+</div>
+{% endblock %}
+{% block scripts %}<script src="/static/clock.js"></script><script src="/static/stopwatch.js"></script>{% endblock %}

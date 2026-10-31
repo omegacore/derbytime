@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Officials{% endblock %}
+{% block content %}
+<p class="small"><a href="/admin">← Admin</a></p>
+<h1>Officials &amp; QR codes</h1>
+<p class="small muted">Phones join at <code>{{ base }}</code>. If that's wrong, set <code>public_base_url</code> in config.toml.</p>
+
+<section class="card">
+  <h2>New join code</h2>
+  <form class="stack" method="post" action="/admin/tokens">
+    <div class="row">
+      <label>Role
+        <select name="role" id="role">
+          {% for r in roles %}<option value="{{ r.value }}">{{ ROLE_LABELS[r.value] }}</option>{% endfor %}
+        </select>
+      </label>
+      <label id="event-field">Event
+        <select name="event_id" id="event">
+          {% for ev in open_events %}<option value="{{ ev.id }}">{{ ev.name }}{% if ev.status.value == 'setup' %} (setup){% endif %}</option>{% endfor %}
+        </select>
+      </label>
+      <label id="track-field">Track
+        <select name="track_id" id="track">
+          <option value="">Any / none</option>
+          {% for ev in open_events %}<optgroup label="{{ ev.name }}" data-event="{{ ev.id }}">
+            {% for t in tracks.values() if t.event_id == ev.id %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+          </optgroup>{% endfor %}
+        </select>
+      </label>
+      <label>Lane <input name="lane" type="number" min="1" max="12" style="width:4.5em"></label>
+      <label><input type="checkbox" name="all_lanes"> One code per lane</label>
+    </div>
+    <div class="row">
+      <label>Label <input name="label" placeholder="e.g. Mrs. Lee"></label>
+      <label>Uses <input name="max_uses" type="number" min="1" value="1" style="width:4.5em"></label>
+      <button class="primary" type="submit">Create</button>
+    </div>
+    <p class="small muted">Every official except an admin works one event, shown on their phone. Lane officials need a track and lane (or tick “one code per lane”). Track operators without a track can run any of their event's tracks. Finished events aren't listed. Codes expire after a few minutes.</p>
+    {% if not open_events %}<p class="msg err">No events are in setup or active. Create or reopen one on the <a href="/admin">admin page</a> first.</p>{% endif %}
+  </form>
+</section>
+<script>
+(() => {
+  const role = document.getElementById('role'), ev = document.getElementById('event'), track = document.getElementById('track');
+  function sync() {
+    const admin = role.value === 'admin';
+    document.getElementById('event-field').hidden = admin;
+    document.getElementById('track-field').hidden = admin;
+    ev.disabled = track.disabled = admin;
+    // only this event's tracks; clear a track left over from another event
+    for (const g of track.querySelectorAll('optgroup')) g.hidden = g.disabled = g.dataset.event !== ev.value;
+    if (track.selectedOptions[0]?.parentElement.disabled) track.value = '';
+  }
+  role.addEventListener('change', sync);
+  ev.addEventListener('change', sync);
+  sync();
+})();
+</script>
+
+{% if codes %}
+<h2>Active codes</h2>
+<div class="grid">
+{% for c in codes %}
+  <div class="card" style="text-align:center">
+    <strong>{{ ROLE_LABELS[c.t.role.value] }}</strong>
+    <div><span class="badge">{{ c.event.name if c.event else 'All events' }}</span></div>
+    <div class="small">{{ c.t.label }}{% if c.track %} · {{ c.track.name }}{% endif %}{% if c.t.lane %} · lane {{ c.t.lane }}{% endif %}</div>
+    <div style="background:#fff;display:inline-block;margin:8px 0;border-radius:8px">{{ c.svg | safe }}</div>
+    <div class="small muted">expires {{ c.t.expires_at.strftime('%H:%M') }} UTC · {{ c.t.max_uses - c.t.uses }} use(s) left</div>
+    <details class="small"><summary>link</summary><code style="word-break:break-all">{{ c.url }}</code></details>
+    <form method="post" action="/admin/tokens/{{ c.t.id }}/revoke"><button class="small" type="submit">Revoke code</button></form>
+  </div>
+{% endfor %}
+</div>
+{% endif %}
+
+<section class="card">
+  <h2>Joined devices</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Event</th><th>Role</th><th>Label</th><th>Track / lane</th><th class="hide-sm">Last seen (UTC)</th><th></th></tr></thead>
+    <tbody>
+    {% for o in officials %}
+      <tr>
+        <td class="small">{% if o.event_id %}{{ events[o.event_id].name if o.event_id in events else o.event_id }}{% if o.event_id in events and events[o.event_id].status.value == 'done' %} <span class="badge">done</span>{% endif %}{% else %}<span class="muted">All events</span>{% endif %}</td>
+        <td>{{ ROLE_LABELS[o.role.value] }}</td>
+        <td>{{ o.label }}{% if me and o.id == me.id %} <span class="badge">you</span>{% endif %}</td>
+        <td class="small">{% if o.track_id %}{{ tracks[o.track_id].name if o.track_id in tracks else o.track_id }}{% endif %}{% if o.lane %} · lane {{ o.lane }}{% endif %}</td>
+        <td class="small hide-sm">{{ o.last_seen.strftime('%H:%M:%S') if o.last_seen else '' }}</td>
+        <td>{% if not (me and o.id == me.id) %}
+          <form method="post" action="/admin/officials/{{ o.id }}/revoke" onsubmit="return confirm('Revoke this device?')"><button class="small bad" type="submit">Revoke</button></form>
+        {% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endblock %}

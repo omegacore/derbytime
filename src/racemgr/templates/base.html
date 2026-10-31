@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f5fbf">
+<title>{% block title %}Race Manager{% endblock %}</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/vendor/htmx.min.js"></script>
+<script src="/static/live.js"></script>
+<script src="/static/follow.js"></script>
+{% block head %}{% endblock %}
+</head>
+<body class="{% if kiosk %}kiosk{% endif %} {% block body_class %}{% endblock %}">
+<header class="top{% if me %} role-{{ me.role.value }}{% endif %}">
+  <div class="bar">
+    <a class="brand" href="/">🏁 Race Manager</a>
+    <nav>
+      {% for n in nav %}<a href="{{ n.href }}"{% if n.current %} aria-current="page"{% endif %}{% if me and loop.first %} class="mine"{% endif %}>{{ n.label }}</a>{% endfor %}
+    </nav>
+    <span id="conn" class="off">connecting…</span>
+  </div>
+  {% if me %}
+  <div class="role-bar">
+    <div class="bar">
+      <a class="role-who" href="/me" title="About this device">
+        <span class="role-name">{{ my_role }}</span>{% if my_scope %}<span class="role-scope">{{ my_scope }}</span>{% endif %}
+      </a>
+      {% if not on_my_page %}<a class="role-home" href="{{ my_home }}">Back to my page →</a>
+      {% else %}<span class="role-hint">{{ my_hint }}</span>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+</header>
+<div id="alerts" aria-live="assertive"></div>
+<main>
+{% if request.query_params.get('msg') %}<div class="msg ok">{{ request.query_params.get('msg') }}</div>{% endif %}
+{% if request.query_params.get('err') %}<div class="msg err">{{ request.query_params.get('err') }}</div>{% endif %}
+{% block content %}{% endblock %}
+</main>
+<div id="toast" aria-live="polite"></div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}Head timekeeper{% endblock %}
+{% block content %}
+<h1>Head timekeeper</h1>
+<div data-live="heat track" hx-get="/partials/timekeeper" hx-trigger="load, rm-load"></div>
+{% endblock %}

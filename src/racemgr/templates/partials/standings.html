@@ -1,0 +1,33 @@
+{# Board slides; standings.js shows one at a time. #}
+{% from "macros.html" import rank_icon %}
+{% for sl in slides %}
+  {% set block = sl.block %}{% set event = sl.event %}{% set board = true %}
+  <section class="slide theme-{{ sl.theme }}{% if block.round and block.round.kind.value == 'group' %} den{% endif %}" data-slide="{{ sl.id }}" data-group="{{ sl.key }}" data-vehicle="{{ sl.vehicle }}">
+    <header class="slide-head">
+      <div class="slide-badge">{% if icons[sl.theme] %}<img class="rank-icon official" src="{{ icons[sl.theme] }}" alt="">{% else %}{{ rank_icon(sl.theme) }}{% endif %}</div>
+      <div class="slide-name">
+        <p class="slide-event">{{ event.name }}</p>
+        <h1 class="slide-title">{{ block.name }}{% if sl.pages > 1 %} <span class="slide-page">{{ sl.page }} of {{ sl.pages }}</span>{% endif %}</h1>
+      </div>
+      <p class="slide-meta">{{ block.approved }}/{{ block.total }} heats{% if block.complete %} · final{% endif %}</p>
+    </header>
+    <div class="slide-body{% if sl.lead %} has-lead{% endif %}">
+      <div class="slide-card">
+        {% if block.rows %}{% include "partials/standings_table.html" %}
+        {% else %}<p class="slide-empty">No results yet</p>{% endif %}
+      </div>
+      {% if sl.lead %}
+      <figure class="spotlight" data-lead="{{ sl.lead.entry_id }}">
+        <span class="spotlight-tag">Leader</span>
+        <img src="{{ sl.lead.photo_url }}" alt="">
+        <figcaption><strong>#{{ sl.lead.number }}</strong> {{ sl.lead.racer_name }}
+          {% if sl.lead.car_name %}<span>{{ sl.lead.car_name }}</span>{% endif %}</figcaption>
+      </figure>
+      {% endif %}
+    </div>
+  </section>
+{% else %}
+  <section class="slide theme-pack" data-slide="none">
+    <header class="slide-head"><div class="slide-badge">{% if icons.pack %}<img class="rank-icon official" src="{{ icons.pack }}" alt="">{% else %}{{ rank_icon("pack") }}{% endif %}</div><h1 class="slide-title slide-name">No events running</h1></header>
+  </section>
+{% endfor %}

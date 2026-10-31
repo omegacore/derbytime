@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="grid">
+  <section class="card">
+    <h2>Find a racer</h2>
+    <input type="search" name="q" placeholder="Name or car number" autocomplete="off" style="width:100%"
+           hx-get="/partials/search" hx-trigger="input changed delay:250ms, search" hx-target="#search-results">
+    <div id="search-results"></div>
+  </section>
+  <section class="card">
+    <h2>Following</h2>
+    <div id="follow-panel"></div>
+  </section>
+</div>
+
+{% if not events %}
+  <div class="card"><p class="muted">No events are running yet.</p></div>
+{% else %}
+  <p class="row">
+    {% for ev in events %}<a class="btn" href="/event/{{ ev.id }}">{{ ev.name }}: schedule &amp; results</a>{% endfor %}
+  </p>
+{% endif %}
+
+<div data-live="track heat" data-jitter="1000" hx-get="/partials/home" hx-trigger="load, rm-load"></div>
+{% endblock %}

@@ -1,0 +1,28 @@
+<form class="card ci-row" data-q="{{ e.number }} {{ r.display_name | lower }}" hx-post="/api/entry/{{ e.id }}/checkin" hx-swap="outerHTML">
+  <div class="row spread">
+    <strong>#{{ e.number }} {{ r.display_name }}</strong>
+    <span class="muted small">{{ g.name if g else '' }}{% if e.name %} · {{ e.name }}{% endif %}</span>
+  </div>
+  <div class="ci-photos">
+    {% set label = "Boat" if event and event.type.value == "regatta" else "Car" %}{% set path = e.photo_path %}
+    <div class="ci-photo{% if path %} has{% endif %}" data-entry="{{ e.id }}" data-kind="entry">
+      <label title="Take a photo of the {{ label | lower }}">
+        <img alt="{{ label }} photo"{% if path %} src="/api/entry/{{ e.id }}/photo/entry?v={{ path }}"{% endif %}>
+        <span class="ci-photo-empty" aria-hidden="true">📷</span>
+        <span class="ci-photo-cap">{{ label }}</span>
+        <input type="file" accept="image/*" capture="environment" hidden>
+      </label>
+      <button type="button" class="ci-photo-del" aria-label="Remove {{ label | lower }} photo">×</button>
+    </div>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <label><input type="checkbox" name="checked_in" {% if e.checked_in %}checked{% endif %}> Checked in</label>
+    <label>Weight (oz) <input name="weight_oz" inputmode="decimal" size="5" value="{{ e.weight_oz if e.weight_oz is not none else '' }}"></label>
+    <select name="inspection_status">
+      {% for s in ['pending', 'passed', 'failed'] %}<option value="{{ s }}" {% if e.inspection_status.value == s %}selected{% endif %}>Inspection: {{ s }}</option>{% endfor %}
+    </select>
+    <input name="inspection_notes" placeholder="Notes" value="{{ e.inspection_notes or '' }}">
+    <button class="primary" type="submit">Save</button>
+    {% if saved %}<span class="badge ok">saved</span>{% endif %}
+  </div>
+</form>

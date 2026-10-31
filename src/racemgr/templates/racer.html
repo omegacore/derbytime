@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ racer.display_name }}{% endblock %}
+{% block content %}
+<div class="row spread">
+  <h1>{{ racer.display_name }} <span class="muted small">{{ group.name if group else '' }}</span></h1>
+  <button data-follow="{{ racer.id }}" data-name="{{ racer.display_name }}">☆ Follow</button>
+</div>
+<div data-live="racer-{{ racer.id }} track" data-jitter="1500" hx-get="/partials/racer/{{ racer.id }}" hx-trigger="load, rm-load"></div>
+{% endblock %}

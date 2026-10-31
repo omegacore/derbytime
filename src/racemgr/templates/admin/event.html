@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}{{ event.name }} · admin{% endblock %}
+{% block content %}
+<p class="small"><a href="/admin">← Admin</a> · <a href="/event/{{ event.id }}">public page</a> · <a href="/display/standings?event={{ event.id }}">standings display</a></p>
+<h1>{{ event.name }}</h1>
+
+<section class="card">
+  <h2>Settings</h2>
+  <form class="stack" method="post" action="/admin/event/{{ event.id }}/settings">
+    <label>Name <input name="name" value="{{ event.name }}"></label>
+    <div class="row">
+      <label>Scoring
+        <select name="scoring_mode">{% for m in modes %}<option value="{{ m.value }}" {% if m == event.scoring_mode %}selected{% endif %}>{{ m.value | replace('_', ' ') }}</option>{% endfor %}</select>
+      </label>
+      <label>Status
+        <select name="status">{% for s in statuses %}<option value="{{ s.value }}" {% if s == event.status %}selected{% endif %}>{{ s.value }}</option>{% endfor %}</select>
+      </label>
+      <label>Finalists per den <input name="finalists_per_group" type="number" min="1" value="{{ event.finalists_per_group }}" style="width:5em"></label>
+      <label>DNF time (s) <input name="dnf_time" inputmode="decimal" value="{{ event.dnf_time }}" style="width:6em"></label>
+    </div>
+    <div><button class="primary" type="submit">Save settings</button></div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Tracks</h2>
+  {% for t in tracks %}
+  <form class="stack" method="post" action="/admin/track/{{ t.id }}" style="border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:12px">
+    <div class="row spread">
+      <strong>{{ t.name }}</strong>
+      <span class="small"><a href="/track/{{ t.id }}/operate">operate</a> · <a href="/display/ondeck/{{ t.id }}">on-deck display</a> · {{ heat_counts.get(t.id, 0) }} heats</span>
+    </div>
+    <div class="row">
+      <label>Name <input name="name" value="{{ t.name }}"></label>
+      <label>Lanes <input name="lane_count" type="number" min="1" max="12" value="{{ t.lane_count }}" style="width:4.5em"></label>
+      <label>Timer
+        <select name="timing_source">{% for k, cls in sources.items() %}<option value="{{ k }}" {% if k == t.timing_source %}selected{% endif %}>{{ cls.label }}</option>{% endfor %}</select>
+      </label>
+      <label>Serial port <input name="port" value="{{ (t.timer_settings or {}).get('port', '') }}" placeholder="COM3 / /dev/ttyUSB0" style="width:10em"></label>
+      <label>Min s <input name="min_time" inputmode="decimal" value="{{ t.min_time }}" style="width:5em"></label>
+      <label>Max s <input name="max_time" inputmode="decimal" value="{{ t.max_time }}" style="width:5em"></label>
+      <label><input type="checkbox" name="active" {% if t.active %}checked{% endif %}> Active</label>
+    </div>
+    <div class="row">
+      <input type="hidden" name="lanes_shown" value="1">
+      <span class="small"><strong>Lanes in use:</strong></span>
+      {% for l in range(1, t.lane_count + 1) %}
+        <label class="lane-chip"><input type="checkbox" name="lane_on" value="{{ l }}" {% if l in t.usable_lanes %}checked{% endif %}> {{ l }}</label>
+      {% endfor %}
+      <button type="submit">Save</button>
+    </div>
+    {% if t.disabled_lanes %}<p class="small flag" style="margin:0">Out of service: lane {{ t.disabled_lanes | join(', ') }}</p>{% endif %}
+  </form>
+  {% endfor %}
+  {% if has_schedule %}<p class="small muted">Untick a broken lane, change lanes, switch a track off, or add a track (e.g. another gutter). Unraced heats are rescheduled across the working tracks automatically; raced heats and their results are kept.</p>{% endif %}
+  <form class="row" method="post" action="/admin/event/{{ event.id }}/tracks">
+    <input name="name" placeholder="New track name" required>
+    <input name="lane_count" type="number" min="1" max="12" placeholder="Lanes" style="width:6em">
+    <button type="submit">Add track</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Roster <span class="muted small">({{ entries|length }} entries)</span></h2>
+  <form class="stack" method="post" action="/admin/event/{{ event.id }}/import" enctype="multipart/form-data">
+    <p class="small muted">Upload the pack roster export (CSV or tab-separated). Only <strong>Scout First Name</strong>, <strong>Scout Last Name</strong> and <strong>Den</strong> are used, and only rows whose <strong>Status</strong> is Active are imported; parent contacts, Member ID, dues and other columns are ignored and not stored. Car numbers are assigned automatically. Scouts are shared across events, so importing the same roster into the regatta reuses them.</p>
+    <input type="file" name="csv_file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values">
+    <textarea name="csv_text" rows="4" placeholder="…or paste the roster here (copying rows straight from the spreadsheet works)"></textarea>
+    <label><input type="checkbox" name="checked_in"> Mark imported racers as checked in</label>
+    <div><button type="submit">Import</button></div>
+  </form>
+  {% if entries %}
+  <details style="margin-top:12px"><summary>Show entries</summary>
+    <div class="table-wrap"><table>
+      <thead><tr><th class="num">#</th><th>Racer</th><th>Den</th><th>Checked in</th><th>Inspection</th></tr></thead>
+      <tbody>{% for e, r, g in entries %}
+        <tr><td class="num">{{ e.number }}</td><td>{{ r.display_name }}{% if e.name %} <span class="muted small">· {{ e.name }}</span>{% endif %}</td><td class="small">{{ g.name if g else '' }}</td>
+        <td>{{ '✓' if e.checked_in else '' }}</td><td class="small">{{ e.inspection_status.value }}</td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+  </details>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Schedule</h2>
+  {% if not has_schedule %}
+    <p class="muted small">Each <strong>run</strong> is one full lane rotation of a den: every car runs every lane once. Dens are sorted by name (Den 2 before Den 10). The order goes down the list, then back up, and so on. You can rearrange it afterwards.</p>
+    <form class="row" method="post" action="/admin/event/{{ event.id }}/schedule">
+      <label>Runs per den <input name="passes" type="number" min="1" max="6" value="{{ default_passes }}" style="width:4.5em"></label>
+      <button class="primary" type="submit">Generate schedule</button>
+    </form>
+  {% else %}
+    {% if problems %}
+    <div class="msg err">
+      <strong>The schedule is out of date.</strong>
+      {% if problems.missing %}<div>Checked in but not scheduled: {{ problems.missing | join(', ') }}</div>{% endif %}
+      {% if problems.scratched %}<div>No longer checked in but still has heats: {{ problems.scratched | join(', ') }}</div>{% endif %}
+    </div>
+    {% endif %}
+    <form class="row" method="post" action="/admin/event/{{ event.id }}/regenerate">
+      <input name="reason" placeholder="Reason (optional), e.g. late arrivals" style="flex:1;min-width:12em">
+      <button class="{{ 'primary' if problems else '' }}" type="submit">Regenerate remaining heats</button>
+    </form>
+    <p class="small muted">Rebuilds every heat that hasn't raced from the current check-ins, tracks and working lanes. Heats already raced, staged or waiting for approval are kept with their results. A late arrival gets a full set of runs.</p>
+
+    <h3>Race order</h3>
+    <p class="small muted">Drag ☰ (or use ↑ ↓) to rearrange. Changes go live on the tracks right away. Finished runs stay in the list for reference.</p>
+    <ol id="race-order" class="order-list" data-event="{{ event.id }}">
+      {% for o in order %}
+      <li data-id="{{ o.round.id }}" class="order-item state-{{ o.state }}">
+        <span class="handle" aria-hidden="true">☰</span>
+        <span class="order-name"><strong>{{ o.round.name }}</strong>
+          <span class="small muted">{{ o.done }}/{{ o.total }} heats{% if multi_track and o.tracks %} · {{ o.tracks | join(' + ') }}{% endif %}</span></span>
+        <span class="badge {{ 'approved' if o.state == 'done' else 'armed' if o.state == 'racing' else 'scheduled' }}">{{ o.state }}</span>
+        <span class="order-btns">
+          <button type="button" class="small" data-move="-1" aria-label="Move up">↑</button>
+          <button type="button" class="small" data-move="1" aria-label="Move down">↓</button>
+          {% if o.removable %}
+          <form method="post" action="/admin/round/{{ o.round.id }}/remove" onsubmit="return confirm('Remove {{ o.round.name }}? Its heats are deleted.')">
+            <button type="submit" class="small bad" aria-label="Remove">✕</button>
+          </form>
+          {% endif %}
+        </span>
+      </li>
+      {% endfor %}
+    </ol>
+    <div class="row" style="margin-top:10px">
+      <form class="row" method="post" action="/admin/event/{{ event.id }}/passes">
+        <select name="group_id">{% for gid, name in dens %}<option value="{{ gid if gid is not none else '' }}">{{ name }}</option>{% endfor %}</select>
+        <button type="submit">Add a run</button>
+      </form>
+      <form method="post" action="/admin/event/{{ event.id }}/reverse"><button type="submit">Reverse order</button></form>
+    </div>
+
+    <h3>Den standings &amp; final</h3>
+    {% for block in standings %}
+      <div style="border-bottom:1px solid var(--line);padding:8px 0">
+        <div class="row spread"><strong>{{ block.name }}</strong><span class="small muted">{{ block.approved }}/{{ block.total }} heats approved</span></div>
+        {% for tie in block.ties %}
+          <form class="row small" method="post" action="/admin/event/{{ event.id }}/runoff" style="margin-top:6px">
+            <span class="flag">Tie:</span> {% for t in tie %}#{{ t.number }} {{ t.racer_name }}{% if not loop.last %}, {% endif %}{% endfor %}
+            <input type="hidden" name="round_id" value="{{ block.round.id }}">
+            <input type="hidden" name="entry_ids" value="{{ tie | map(attribute='entry_id') | join(',') }}">
+            <select name="track_id">{% for t in tracks if t.active %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select>
+            <button type="submit">Add runoff</button>
+          </form>
+        {% endfor %}
+      </div>
+    {% endfor %}
+    <div class="row" style="margin-top:12px">
+      <form class="row" method="post" action="/admin/event/{{ event.id }}/final">
+        <select name="track_id">{% for t in tracks if t.active %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select>
+        <button class="primary" type="submit">Create final (top {{ event.finalists_per_group }} per den)</button>
+      </form>
+      <form method="post" action="/admin/event/{{ event.id }}/clear" onsubmit="return confirm('Delete all rounds and heats for this event?')">
+        <button class="bad" type="submit">Clear schedule</button>
+      </form>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="/static/vendor/Sortable.min.js"></script>
+<script src="/static/race_order.js"></script>
+{% endblock %}

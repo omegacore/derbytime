@@ -1,0 +1,25 @@
+{% from "macros.html" import lanes_list, heat_title, status_badge %}
+<div class="grid">
+{% for st in tracks %}
+  <section class="card">
+    <div class="row spread">
+      <h2 style="margin:0">{{ st.track.name }}</h2>
+      <span class="muted small">{{ st.event.name }}</span>
+    </div>
+    {% if st.current %}
+      <h3>Now: {{ heat_title(st.current) }} {{ status_badge(st.current.status) }}</h3>
+      {{ lanes_list(st.current, results=False) }}
+    {% elif st.last %}
+      <h3>Last: {{ heat_title(st.last) }} {{ status_badge(st.last.status) }}</h3>
+      {{ lanes_list(st.last) }}
+    {% else %}
+      <p class="muted">Not started yet.</p>
+    {% endif %}
+    {% for h in st.upcoming[:2] %}
+      <h3>{% if loop.first %}On deck{% else %}Next up{% endif %}: {{ heat_title(h) }}</h3>
+      {{ lanes_list(h, results=False) }}
+    {% endfor %}
+    <p class="small muted">{{ st.remaining }} heat(s) left · <a href="/display/ondeck/{{ st.track.id }}">on-deck screen</a></p>
+  </section>
+{% endfor %}
+</div>

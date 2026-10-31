@@ -1,0 +1,37 @@
+{% from "macros.html" import status_badge, racer_label, lane_result %}
+<p class="muted">{{ event.type.value | capitalize }} · scored by {{ event.scoring_mode.value | replace('_', ' ') }}</p>
+
+<h2>Standings</h2>
+{% for block in standings %}
+<section class="card">
+  <div class="row spread">
+    <h3 style="margin:0">{{ block.name }}</h3>
+    <span class="muted small">{{ block.approved }}/{{ block.total }} heats{% if block.complete %} · complete{% endif %}</span>
+  </div>
+  {% include "partials/standings_table.html" %}
+</section>
+{% else %}
+<p class="muted">No schedule yet.</p>
+{% endfor %}
+
+<h2>Schedule</h2>
+{% for r in schedule %}
+<details class="card" {% if not loop.index0 %}open{% endif %}>
+  <summary><strong>{{ r.round.name }}</strong> <span class="muted small">({{ r.heats|length }} heats)</span></summary>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Heat</th><th>Track</th>{% for i in range(r.heats[0].lanes|length if r.heats else 0) %}<th>Lane {{ i + 1 }}</th>{% endfor %}<th></th></tr></thead>
+    <tbody>
+    {% for h in r.heats %}
+      <tr>
+        <td>{{ h.number }}{% if h.is_rerun %}<span class="muted small">R</span>{% endif %}</td>
+        <td class="small">{{ h.track_name }}</td>
+        {% for l in h.lanes %}<td class="small">{{ racer_label(l) }}<br>{{ lane_result(l) }}</td>{% endfor %}
+        <td>{{ status_badge(h.status) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</details>
+{% endfor %}

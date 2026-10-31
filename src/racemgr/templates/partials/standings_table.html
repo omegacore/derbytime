@@ -1,0 +1,29 @@
+{# expects: block (from event_standings), event; board=true adds vehicle photos #}
+{% from "macros.html" import vehicle_glyph %}
+<div class="table-wrap">
+<table>
+  <thead><tr>
+    <th class="num">#</th>{% if board %}<th class="col-car"></th>{% endif %}<th>Racer</th><th class="hide-sm col-den">Den</th>
+    {% if event.scoring_mode.value == 'points' %}<th class="num">Pts</th>{% endif %}
+    <th class="num">Avg</th><th class="num">Best</th><th class="num hide-sm">Runs</th>
+  </tr></thead>
+  <tbody>
+  {% for row in block.rows %}
+    {% set podium = row.s.score is not none and row.s.rank <= 3 %}
+    <tr data-key="{{ block.round.id if block.round else 'pack' }}-{{ row.racer_id }}" data-rank="{{ row.s.rank }}"
+        data-sig="{{ row.s.rank }}|{{ row.s.points }}|{{ row.s.average }}|{{ row.s.best }}|{{ row.s.runs }}"
+        {% if podium %}class="podium p{{ row.s.rank }}"{% endif %}>
+      <td class="num"><span class="rank">{{ row.s.rank if row.s.score is not none else "–" }}</span>{% if row.s.tied %}<span class="flag" title="tied">=</span>{% endif %}</td>
+      {% if board %}<td class="col-car">{% if row.photo_url %}<img src="{{ row.photo_url }}" alt="">{% else %}{{ vehicle_glyph(event.type.value) }}{% endif %}</td>{% endif %}
+      <td><strong>#{{ row.number }}</strong> <a href="/racer/{{ row.racer_id }}">{{ row.racer_name }}</a>
+          {% if row.car_name %}<span class="muted small hide-sm">· {{ row.car_name }}</span>{% endif %}</td>
+      <td class="hide-sm muted col-den">{{ row.group }}</td>
+      {% if event.scoring_mode.value == 'points' %}<td class="num">{{ row.s.points }}</td>{% endif %}
+      <td class="num">{{ row.s.average | t }}</td>
+      <td class="num">{{ row.s.best | t }}</td>
+      <td class="num hide-sm">{{ row.s.runs }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>

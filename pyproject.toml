@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "racemgr"
+version = "0.1.0"
+description = "Self-hosted race manager for Cub Scout Pinewood Derby and Rain Gutter Regatta events"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "sqlmodel>=0.0.16",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+    "pyserial-asyncio>=0.6",
+    "segno>=1.6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.27"]
+
+[project.scripts]
+racemgr = "racemgr.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+racemgr = ["templates/**/*", "static/**/*", "config.example.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

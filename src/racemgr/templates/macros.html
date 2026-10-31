@@ -1,0 +1,109 @@
+{% macro racer_label(l, link=True) -%}
+  {%- if l.bye -%}<span class="bye">bye</span>
+  {%- else -%}
+    <strong>#{{ l.number }}</strong>
+    {% if link %}<a href="/racer/{{ l.racer_id }}">{{ l.racer_name }}</a>{% else %}{{ l.racer_name }}{% endif %}
+    {% if l.car_name %}<span class="muted small">· {{ l.car_name }}</span>{% endif %}
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro status_badge(status) -%}<span class="badge {{ status }}">{{ status }}</span>{%- endmacro %}
+
+{% macro heat_title(h) -%}
+  {{ h.round_name }} · heat {{ h.number }}{% if h.is_rerun %} (re-run){% endif %}
+{%- endmacro %}
+
+{% macro lane_result(l) -%}
+  {%- if l.has_result -%}
+    <span class="{% if l.outlier %}flag{% endif %}">{{ l.final_time | t(l.dnf) }}</span>
+    {% if l.place %}<span class="muted small">P{{ l.place }}</span>{% endif %}
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro lanes_list(h, link=True, results=True) %}
+<div class="lanes">
+  {% for l in h.lanes %}
+  <div class="lane-row">
+    <div class="lane-no">{{ l.lane }}</div>
+    <div>{{ racer_label(l, link) }}</div>
+    <div class="num">{% if results %}{{ lane_result(l) }}{% endif %}</div>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro rerun_form(h) %}
+{# One dropdown + one button so a phone operator can call a re-run in two taps. #}
+<form class="row rerun-form" hx-post="/api/heat/{{ h.id }}/rerun" hx-swap="none">
+  <select name="reason" required aria-label="Re-run reason"
+          onchange="const o=this.form.querySelector('[name=reason_other]'); o.hidden=this.value!=='__other'; if(!o.hidden) o.focus()">
+    <option value="">Re-run because…</option>
+    {% for r in rerun_reasons(h.event_type) %}<option>{{ r }}</option>{% endfor %}
+    <option value="__other">Other…</option>
+  </select>
+  <input name="reason_other" placeholder="What happened?" autocomplete="off" hidden>
+  <button class="bad" type="submit">Re-run</button>
+</form>
+{% endmacro %}
+
+{# Original line-art rank icons for the standings board. Shapes use
+   currentColor; "cut" details use --ico-cut so they read as knock-outs. #}
+{% macro rank_icon(theme) -%}
+<svg class="rank-icon" viewBox="0 0 64 64" aria-hidden="true">
+{%- if theme == "lion" %}
+  <polygon class="fg" points="32.0,4.0 35.8,11.3 41.9,5.7 43.0,13.9 50.6,10.8 48.9,18.9 57.1,18.5 52.7,25.5 60.6,28.0 54.0,33.0 60.6,38.0 52.7,40.5 57.1,47.5 48.9,47.1 50.6,55.2 43.0,52.1 41.9,60.3 35.8,54.7 32.0,62.0 28.2,54.7 22.1,60.3 21.0,52.1 13.4,55.2 15.1,47.1 6.9,47.5 11.3,40.5 3.4,38.0 10.0,33.0 3.4,28.0 11.3,25.5 6.9,18.5 15.1,18.9 13.4,10.8 21.0,13.9 22.1,5.7 28.2,11.3"/>
+  <circle class="cut" cx="32" cy="34" r="16"/>
+  <circle class="fg" cx="26" cy="31" r="2.4"/><circle class="fg" cx="38" cy="31" r="2.4"/>
+  <path class="fg" d="M28.5 37h7L32 41.5z"/>
+  <path class="line" d="M32 41.5v2.5M27.5 44.5c2 1.8 3.5 1 4.5-.5 1 1.5 2.5 2.3 4.5.5"/>
+{%- elif theme == "tiger" %}
+  <circle class="fg" cx="15" cy="18" r="8"/><circle class="fg" cx="49" cy="18" r="8"/>
+  <circle class="cut" cx="15" cy="18" r="3.6"/><circle class="cut" cx="49" cy="18" r="3.6"/>
+  <ellipse class="fg" cx="32" cy="36" rx="23" ry="20"/>
+  <path class="cut" d="M29.5 16.5 32 26l2.5-9.5zM22 18.5l3.5 7 1.5-7.5zM42 18.5l-3.5 7-1.5-7.5zM9.5 31l10 3.5-10 3.5zM54.5 31l-10 3.5 10 3.5zM11.5 42.5h9.5l-8 4.5zM52.5 42.5H43l8 4.5z"/>
+  <circle class="cut" cx="24" cy="33" r="2.8"/><circle class="cut" cx="40" cy="33" r="2.8"/>
+  <ellipse class="cut" cx="32" cy="45" rx="9" ry="6.5"/>
+  <path class="fg" d="M28.5 40.5h7L32 45z"/>
+  <path class="line" d="M32 45v3"/>
+{%- elif theme == "wolf" %}
+  <path class="fg" d="M11 5l14 16h14L53 5l-2 25-8 12-6 16h-10l-6-16-8-12z"/>
+  <path class="cut" d="M15.5 13 22 21.5l-4.5 2zM48.5 13 42 21.5l4.5 2zM21 30.5l8 2.3-6.8 2.2zM43 30.5l-8 2.3 6.8 2.2z"/>
+  <ellipse class="cut" cx="32" cy="53" rx="4" ry="2.8"/>
+  <path class="line cut-line" d="M32 37v10"/>
+{%- elif theme == "bear" %}
+  <circle class="fg" cx="15" cy="16" r="9"/><circle class="fg" cx="49" cy="16" r="9"/>
+  <circle class="cut" cx="15" cy="16" r="4.5"/><circle class="cut" cx="49" cy="16" r="4.5"/>
+  <circle class="fg" cx="32" cy="36" r="22"/>
+  <circle class="cut" cx="23" cy="31" r="3"/><circle class="cut" cx="41" cy="31" r="3"/>
+  <ellipse class="cut" cx="32" cy="45" rx="11" ry="8.5"/>
+  <ellipse class="fg" cx="32" cy="41.5" rx="4.5" ry="3.2"/>
+  <path class="line" d="M32 44v4M28 49.5c2 1 6 1 8 0"/>
+{%- elif theme == "webelos" %}
+  <path class="fg" d="M32 5l23 8v19c0 14-10 23-23 28C19 55 9 46 9 32V13z"/>
+  <path class="line cut-line wide" d="M18 21l6.5 23L32 29l7.5 15L46 21"/>
+{%- elif theme == "aol" %}
+  <path class="line wide" d="M12.6 36.0L6.1 33.3M17.2 29.2L12.2 24.2M24.0 24.6L21.3 18.1M32.0 23.0L32.0 16.0M40.0 24.6L42.7 18.1M46.8 29.2L51.8 24.2M51.4 36.0L57.9 33.3"/>
+  <path class="fg" d="M14 44a18 18 0 0 1 36 0z"/>
+  <path class="line wide" d="M6 52h44"/>
+  <path class="fg" d="M60 52l-12-6.5 2.5 6.5-2.5 6.5z"/>
+  <path class="line" d="M6 52l-3-4.5M6 52l-3 4.5M11 52l-3-4.5M11 52l-3 4.5"/>
+{%- else %}
+  <path class="fg" d="M20 9h24v15c0 10-5.5 16-12 16s-12-6-12-16z"/>
+  <path class="line wide" d="M20 14h-7c0 11 5 15 9 15M44 14h7c0 11-5 15-9 15"/>
+  <rect class="fg" x="28.5" y="39" width="7" height="9"/>
+  <rect class="fg" x="19" y="48" width="26" height="7" rx="2"/>
+  <path class="cut" d="M32 15.5l2.1 4.3 4.7.7-3.4 3.3.8 4.7-4.2-2.2-4.2 2.2.8-4.7-3.4-3.3 4.7-.7z"/>
+{%- endif %}
+</svg>
+{%- endmacro %}
+
+{# Placeholder for an entry with no vehicle photo yet: a car or a boat. #}
+{% macro vehicle_glyph(event_type) -%}
+<svg class="vehicle-glyph" viewBox="0 0 48 32" aria-hidden="true">
+{%- if event_type == "regatta" %}
+  <path d="M25 4v18M25 5l11 15H25M23 9l-9 11h9"/><path d="M8 24h32l-5 5H13z"/>
+{%- else %}
+  <path d="M5 21v-4l8-2 6-6h12l7 6 6 1v5h-3M13 21h18M9 21H5"/><circle cx="13" cy="22" r="3.5"/><circle cx="35" cy="22" r="3.5"/>
+{%- endif %}
+</svg>
+{%- endmacro %}

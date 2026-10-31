@@ -1,0 +1,8 @@
+{% if q and not rows %}<p class="muted small">No racers match “{{ q }}”.</p>{% endif %}
+{% for r, g in rows %}
+<div class="row spread" style="padding:6px 0">
+  <a href="/racer/{{ r.id }}">{{ r.display_name }}</a>
+  <span class="muted small">{{ g.name if g else '' }}</span>
+  <button class="small" data-follow="{{ r.id }}" data-name="{{ r.display_name }}">☆ Follow</button>
+</div>
+{% endfor %}

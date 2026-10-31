@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Check-in{% endblock %}
+{% block scripts %}<script src="/static/checkin.js"></script>{% endblock %}
+{% block content %}
+<div class="row spread">
+  <h1>Check-in</h1>
+  {% if events|length > 1 %}
+  <form method="get" class="row">
+    <select name="event" onchange="this.form.submit()">
+      {% for ev in events %}<option value="{{ ev.id }}" {% if event and ev.id == event.id %}selected{% endif %}>{{ ev.name }}</option>{% endfor %}
+    </select>
+  </form>
+  {% elif event %}<span class="badge">{{ event.name }}</span>{% endif %}
+</div>
+{% if not event %}<p class="muted">No events.</p>{% else %}
+<p class="muted small">Only checked-in entries that haven't failed inspection are scheduled. Tap a photo box to take a picture with this phone’s camera.</p>
+<input type="search" placeholder="Filter by name or number" style="width:100%;margin-bottom:12px"
+       oninput="const q=this.value.toLowerCase();document.querySelectorAll('.ci-row').forEach(r=>r.style.display=r.dataset.q.includes(q)?'':'none')">
+<div id="ci-list">
+{% for e, r, g in rows %}{% include "partials/checkin_row.html" %}{% endfor %}
+</div>
+{% endif %}
+{% endblock %}

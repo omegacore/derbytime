@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Admin{% endblock %}
+{% block content %}
+<h1>Admin</h1>
+<p class="row">
+  <a class="btn" href="/admin/officials">Officials &amp; QR codes</a>
+  <a class="btn" href="/timekeeper">Timekeeper</a>
+  <a class="btn" href="/checkin">Check-in</a>
+  <a class="btn" href="/display/standings">Standings display</a>
+  <a class="btn" href="/admin/audit">Audit log</a>
+</p>
+
+<section class="card">
+  <h2>Events</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Event</th><th>Type</th><th>Status</th><th class="num">Entries</th></tr></thead>
+    <tbody>
+    {% for ev in events %}
+      <tr>
+        <td><a href="/admin/event/{{ ev.id }}">{{ ev.name }}</a></td>
+        <td>{{ ev.type.value }}</td>
+        <td><span class="badge {{ 'ok' if ev.status.value == 'active' else 'scheduled' }}">{{ ev.status.value }}</span></td>
+        <td class="num">{{ counts.get(ev.id, 0) }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="4" class="muted">No events yet. Create one below, or run <code>racemgr seed-demo</code>.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section class="card">
+  <h2>New event</h2>
+  <form class="stack" method="post" action="/admin/events">
+    <label>Name <input name="name" required placeholder="Pack 123 Pinewood Derby"></label>
+    <label>Type
+      <select name="type">{% for t in types %}<option value="{{ t.value }}">{{ t.value | capitalize }}</option>{% endfor %}</select>
+    </label>
+    <label>Scoring
+      <select name="scoring_mode"><option value="">Default for type</option>{% for m in modes %}<option value="{{ m.value }}">{{ m.value | replace('_', ' ') }}</option>{% endfor %}</select>
+    </label>
+    <label>Date <input type="date" name="event_date"></label>
+    <button class="primary" type="submit">Create event</button>
+  </form>
+</section>
+{% endblock %}

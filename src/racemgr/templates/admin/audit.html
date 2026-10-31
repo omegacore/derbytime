@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Audit log{% endblock %}
+{% block content %}
+<p class="small"><a href="/admin">← Admin</a></p>
+<h1>Audit log</h1>
+<div class="table-wrap">
+<table class="small">
+  <thead><tr><th>Time (UTC)</th><th>Who</th><th>Action</th><th>Target</th><th>Reason</th><th>Change</th></tr></thead>
+  <tbody>
+  {% for a in rows %}
+    <tr>
+      <td>{{ a.ts.strftime('%H:%M:%S') }}</td>
+      <td>{{ a.actor }}</td>
+      <td>{{ a.action }}</td>
+      <td>{{ a.entity_type }} {{ a.entity_id or '' }}</td>
+      <td>{{ a.reason or '' }}</td>
+      <td><code style="word-break:break-all">{% if a.before %}{{ a.before | tojson }} → {% endif %}{{ a.after | tojson if a.after else '' }}</code></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

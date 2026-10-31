@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Operate {{ track.name }}{% endblock %}
+{% block scripts %}<script src="/static/clock.js"></script>{% endblock %}
+{% block content %}
+<h1>Operate: {{ track.name }}</h1>
+<div data-live="track-{{ track.id }} timer" hx-get="/partials/operate/{{ track.id }}" hx-trigger="load, rm-load"></div>
+{% endblock %}

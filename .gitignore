@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.egg-info/
+*.db
+*.db-wal
+*.db-shm
+data/
+config.toml
+*.pem
+.pytest_cache/
+
+# local roster exports (contain family PII)
+*Roster*.csv
+roster2026-27

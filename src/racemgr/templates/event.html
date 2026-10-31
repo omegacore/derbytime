@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}{{ event.name }}{% endblock %}
+{% block content %}
+<h1>{{ event.name }}</h1>
+<div data-live="event-{{ event.id }}" data-jitter="1500" hx-get="/partials/event/{{ event.id }}" hx-trigger="load, rm-load"></div>
+{% endblock %}

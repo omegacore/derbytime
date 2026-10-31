@@ -1,0 +1,22 @@
+<div id="lane-info-data" class="card lane-info"
+     data-heat="{{ cur.id if cur else '' }}"
+     data-armed="{{ '1' if cur and cur.status == 'armed' else '0' }}"
+     data-occupied="{{ '1' if my and not my.bye else '0' }}"
+     data-has-result="{{ '1' if my and (my.has_result or my.stopped) else '0' }}"
+     data-start="{{ cur.start_ms if cur and cur.start_ms else '' }}"
+     data-start-source="{{ cur.start_source if cur and cur.start_source else '' }}">
+  {% if cur %}
+    <div class="muted">{{ cur.round_name }} heat {{ cur.number }} · <strong>{{ 'ARMED: start on the signal' if cur.status == 'armed' else 'staged: wait for arm' }}</strong></div>
+    {% if my and not my.bye %}
+      <div class="racer">#{{ my.number }} {{ my.racer_name }}</div>
+      {% if my.car_name %}<div class="muted">{{ my.car_name }}</div>{% endif %}
+      {% if my.has_result %}<div class="badge ok">recorded {{ my.final_time | t(my.dnf) }}</div>
+      {% elif my.stopped %}<div class="badge pending">stop recorded, waiting for the start time</div>{% endif %}
+    {% else %}
+      <div class="racer muted">No boat in this lane</div>
+    {% endif %}
+  {% else %}
+    <div class="muted">No heat staged.</div>
+    {% if my_next and not my_next.bye %}<div>Next: <strong>#{{ my_next.number }} {{ my_next.racer_name }}</strong></div>{% endif %}
+  {% endif %}
+</div>

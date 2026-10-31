@@ -1,0 +1,104 @@
+{% from "macros.html" import lanes_list, heat_title, status_badge, racer_label, rerun_form %}
+{% set tid = st.track.id %}
+{% set cur = st.current %}
+<section class="card">
+  <div class="row spread">
+    <span>Timer: <strong>{{ st.timer.label or st.track.timing_source }}</strong></span>
+    <span class="badge {{ 'ok' if st.timer.connected else 'bad' }}">{{ 'connected' if st.timer.connected else 'disconnected' }}</span>
+  </div>
+  <p class="small muted" style="margin:.3em 0 0">{{ st.timer.detail }}</p>
+</section>
+
+<section class="card">
+  {% if cur %}
+    <div class="row spread">
+      <h2 style="margin:0">{{ heat_title(cur) }}</h2>{{ status_badge(cur.status) }}
+    </div>
+    {{ lanes_list(cur) }}
+    {% if st.timer.human and cur.status == 'armed' %}
+    <div class="start-panel">
+      {% if cur.start_ms %}
+        <div class="start-running">
+          <span class="run-clock" data-running-from="{{ cur.start_ms }}">0.0</span><span class="muted"> s</span>
+        </div>
+        <div class="small">Started by <strong>{{ cur.start_source }}</strong>. Lane officials press STOP as their boat finishes.
+          {% set waiting = cur.lanes | selectattr('bye', 'equalto', false) | rejectattr('has_result') | list %}
+          {% if waiting %}<br>Waiting on lane {{ waiting | map(attribute='lane') | join(', ') }}.{% endif %}</div>
+      {% else %}
+        <button class="start-btn" data-start-heat="{{ cur.id }}" data-track="{{ tid }}">START</button>
+        <div class="small muted">Press the moment the boats are released. The start goes to every lane official, who then only press STOP. If a lane official presses START first, the earliest press counts.</div>
+      {% endif %}
+    </div>
+    {% endif %}
+    <div class="row" style="margin-top:12px">
+      {% if cur.status == 'staged' %}
+        <button class="primary" hx-post="/api/track/{{ tid }}/arm" hx-swap="none">Arm heat</button>
+        <button hx-post="/api/track/{{ tid }}/unstage" hx-swap="none">Unstage</button>
+      {% else %}
+        <span class="muted">
+          {% if st.timer.human %}{{ 'Waiting for lane officials…' if cur.started else 'Armed: waiting for START…' }}{% else %}Armed: waiting for the timer…{% endif %}
+        </span>
+        <button hx-post="/api/track/{{ tid }}/disarm" hx-swap="none" hx-confirm="Disarm? The heat goes back to staged and every lane official's stopwatch resets.">Disarm</button>
+      {% endif %}
+    </div>
+    {% if cur.started %}
+    <div style="margin-top:10px">{{ rerun_form(cur) }}</div>
+    {% endif %}
+    <details style="margin-top:12px">
+      <summary>Manual entry (timer failed)</summary>
+      <form class="stack" hx-post="/api/track/{{ tid }}/manual" hx-swap="none" style="margin-top:8px">
+        {% for l in cur.lanes if not l.bye %}
+          <label>Lane {{ l.lane }}: #{{ l.number }} {{ l.racer_name }}
+            <input name="lane_{{ l.lane }}" inputmode="decimal" placeholder="3.123 or DNF" value="{{ l.raw_time if l.raw_time is not none else ('DNF' if l.dnf else '') }}" autocomplete="off">
+          </label>
+        {% endfor %}
+        <div class="row"><button class="primary" type="submit">Submit as pending</button><button type="button" data-cancel>Cancel</button></div>
+      </form>
+    </details>
+  {% else %}
+    <h2 style="margin-top:0">Nothing staged</h2>
+    {% if st.upcoming %}
+      {% set nxt = st.upcoming[0] %}
+      {% if nxt.blocked %}<p class="flag">Some racers in the next heat are on another track right now.</p>{% endif %}
+      <button class="primary" hx-post="/api/track/{{ tid }}/stage" hx-swap="none" {% if nxt.blocked %}disabled{% endif %}>Stage next: {{ heat_title(nxt) }}</button>
+    {% else %}
+      <p class="muted">The queue is empty.</p>
+    {% endif %}
+  {% endif %}
+</section>
+
+{% if st.pending %}
+<section class="card">
+  <h2 style="margin-top:0">Awaiting head timekeeper</h2>
+  {% for h in st.pending %}
+    <h3>{{ heat_title(h) }} {% if h.flagged %}<span class="flag">⚑ check times</span>{% endif %}</h3>
+    {{ lanes_list(h) }}
+  {% endfor %}
+</section>
+{% endif %}
+
+<section class="card">
+  <h2 style="margin-top:0">Queue <span class="muted small">({{ st.remaining }} left)</span></h2>
+  {% for h in st.upcoming %}
+    <div class="row spread" style="border-bottom:1px solid var(--line);padding:6px 0">
+      <div>
+        <strong>{{ heat_title(h) }}</strong>{% if h.blocked %} <span class="flag small">racer busy elsewhere</span>{% endif %}<br>
+        <span class="small">{% for l in h.lanes %}L{{ l.lane }} {% if l.bye %}<span class="bye">bye</span>{% else %}#{{ l.number }} {{ l.racer_name }}{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</span>
+      </div>
+      {% if not cur and not loop.first %}
+        <button class="small" hx-post="/api/track/{{ tid }}/stage" hx-vals='{"heat_id": "{{ h.id }}"}' hx-swap="none" {% if h.blocked %}disabled{% endif %}>Stage</button>
+      {% endif %}
+    </div>
+  {% else %}
+    <p class="muted">No heats queued.</p>
+  {% endfor %}
+</section>
+
+{% if st.last %}
+<section class="card">
+  <h2 style="margin-top:0">Last approved: {{ heat_title(st.last) }}</h2>
+  {{ lanes_list(st.last) }}
+</section>
+{% endif %}
+<p class="small"><a href="/display/ondeck/{{ tid }}" target="_blank">Open on-deck display</a>
+{% if st.timer.human %}· Lane pages: {% for n in range(1, st.track.lane_count + 1) %}<a href="/track/{{ tid }}/lane/{{ n }}">lane {{ n }}</a> {% endfor %}{% endif %}</p>

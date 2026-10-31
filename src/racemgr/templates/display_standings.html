@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Standings{% endblock %}
+{% block body_class %}board{% endblock %}
+{% block head %}<script src="/static/standings.js"></script>{% endblock %}
+{% block content %}
+<div class="board-live off" id="board-live"><span class="dot"></span><span class="txt">connecting…</span></div>
+<div data-live="standings" data-board data-secs="{{ secs }}" hx-get="/partials/standings{{ query }}" hx-trigger="load, rm-load, every 60s"></div>
+<div class="board-progress" id="board-progress" data-vehicle="car">
+  <span id="board-bar"><span class="board-rider" aria-hidden="true">
+    <svg class="rider-car" viewBox="0 0 64 30">
+      <path class="body" d="M3 13c0-2 1-3 4-3h12l6 2h14l20 7c2 .7 3 2 3 3.5V23H3z"/>
+      <path class="trim" d="M27 13h10l-2 3h-9z"/>
+      <circle class="wheel" cx="14" cy="23" r="5.5"/><circle class="hub" cx="14" cy="23" r="2"/>
+      <circle class="wheel" cx="48" cy="23" r="5.5"/><circle class="hub" cx="48" cy="23" r="2"/>
+    </svg>
+    <svg class="rider-boat" viewBox="0 0 48 44">
+      <path class="mast" d="M24 3v30"/>
+      <path class="sail" d="M25.5 4 41 31H25.5z"/><path class="sail jib" d="M22.5 9 10 31h12.5z"/>
+      <path class="body" d="M4 33h40l-6 7H10z"/>
+      <path class="wave" d="M0 42c4 0 4-2 8-2s4 2 8 2 4-2 8-2 4 2 8 2 4-2 8-2 4 2 8 2"/>
+    </svg>
+  </span></span>
+</div>
+{% endblock %}

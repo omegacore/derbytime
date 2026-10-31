@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}This device{% endblock %}
+{% block content %}
+<div class="card">
+  {% if me %}
+    <h1>{{ ROLE_LABELS[me.role.value] }}</h1>
+    <p>{{ me.label }}{% if track %} · {{ track.name }}{% endif %}{% if me.lane %} · lane {{ me.lane }}{% endif %}</p>
+    <p>Event: <strong>{{ event.name if event else 'All events' }}</strong></p>
+    <p><a class="btn primary" href="{{ home }}">Go to my page</a></p>
+    <form method="post" action="/logout"><button type="submit">Sign this device out</button></form>
+  {% else %}
+    <h1>Viewer</h1>
+    <p>This device isn't signed in as an official. Officials join by scanning a QR code from the admin.</p>
+  {% endif %}
+</div>
+{% endblock %}
