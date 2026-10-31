@@ -157,3 +157,32 @@ def test_queued_den_heats_show_next_free_track(settings, session):
     session.add(b)
     session.commit()
     assert views.heat_view(session, heat)["track_name"] != "Next free track"
+
+
+def test_projected_finish_shares_queue_by_pace(settings, session):
+    from datetime import timedelta
+
+    from racemgr.models import utcnow
+    from racemgr.services.schedule import projected_finish
+
+    ev, (a, b) = two_track_event(session, settings)
+    total = len(views.scheduled_heats(session, [a, b]))
+    now = utcnow()
+    # same estimated pace: the queue splits evenly
+    p = projected_finish(session, ev, 60.0, now=now)
+    assert [r["remaining"] for r in p["tracks"]] == [total // 2, total - total // 2]
+    assert p["remaining"] == total
+
+    # A has been racing a heat every 30 s: it takes about twice B's share
+    heats = list(session.exec(select(Heat).where(Heat.status == HeatStatus.scheduled).order_by(Heat.id)))[:4]
+    for i, h in enumerate(heats):
+        h.status, h.track_id, h.results_at = HeatStatus.approved, a.id, now - timedelta(seconds=30 * (4 - i))
+        session.add(h)
+    session.commit()
+    left = total - 4
+    p = projected_finish(session, ev, 60.0, now=now)
+    ra, rb = p["tracks"]
+    assert ra["measured"] and ra["pace"] == 30 and not rb["measured"]
+    assert ra["remaining"] + rb["remaining"] == left
+    assert abs(ra["remaining"] - 2 * rb["remaining"]) <= 2
+    assert p["seconds"] == max(ra["seconds"], rb["seconds"])
