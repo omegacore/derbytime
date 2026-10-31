@@ -103,6 +103,7 @@ class LoadTest:
         self.plan, self.viewers, self.heats, self.gap = plan, viewers, heats, gap
         self.lat: dict[str, list[float]] = defaultdict(list)
         self.errors: dict[str, int] = defaultdict(int)
+        self.retries = 0  # GETs retried after a keep-alive race (see get())
         self.ws_lag: list[float] = []
         self.heats_done = 0
         self.stop = asyncio.Event()
@@ -123,6 +124,16 @@ class LoadTest:
             self.errors[f"{name} {type(e).__name__}"] += 1
         finally:
             self.lat[name].append((time.perf_counter() - t0) * 1000)
+
+    async def get(self, c, url: str):
+        """GET that, like a browser, retries once when the server closed the
+        idle keep-alive connection just as we reused it (the uvicorn keep-alive
+        race). Counted in `retries` so it stays visible in the report."""
+        try:
+            return await c.get(url)
+        except (self.httpx.ReadError, self.httpx.RemoteProtocolError):
+            self.retries += 1
+            return await c.get(url)
 
     async def joined(self, name: str):
         if name not in self._joined:
@@ -146,14 +157,14 @@ class LoadTest:
 
             async def go():
                 await asyncio.sleep(delay)
-                await self.timed(name, c.get(url))
+                await self.timed(name, self.get(c, url))
 
             pending[slot] = asyncio.create_task(go())
 
         follow_url = f"/api/racers?ids={follow}"
-        await self.timed(f"{tag} partial", c.get(partial))
+        await self.timed(f"{tag} partial", self.get(c, partial))
         if follow:
-            await self.timed("follow panel", c.get(follow_url))
+            await self.timed("follow panel", self.get(c, follow_url))
         cookie = "; ".join(f"{k}={v}" for k, v in c.cookies.items())
         try:
             import websockets
@@ -186,10 +197,10 @@ class LoadTest:
         roll = random.random()
         if roll < 0.75 and self.plan["racers"]:  # a parent on their scout's page, following them
             rid = random.choice(self.plan["racers"])
-            await self.timed("racer page", c.get(f"/racer/{rid}"))
+            await self.timed("racer page", self.get(c, f"/racer/{rid}"))
             await self.phone(c, [f"racer-{rid}", "track"], f"/partials/racer/{rid}", "racer", 1.5, follow=rid)
         elif roll < 0.95:
-            await self.timed("home page", c.get("/"))
+            await self.timed("home page", self.get(c, "/"))
             await self.phone(c, ["track", "heat"], "/partials/home", "home", 1.0)
         else:
             ev = random.choice(self.plan["events"])
@@ -216,7 +227,7 @@ class LoadTest:
         done = tries = 0
         while done < self.heats and tries < self.heats * 3:
             tries += 1
-            st = await self.timed("GET track state", op.get(f"/api/track/{tid}/state"))
+            st = await self.timed("GET track state", self.get(op, f"/api/track/{tid}/state"))
             if st is None or st.status_code != 200:
                 await asyncio.sleep(self.gap)
                 continue
@@ -280,6 +291,8 @@ class LoadTest:
             print(f"{name:24s} {len(v):6d} {pct(v, .5):7.0f} {pct(v, .95):7.0f} {max(v):7.0f}")
         if self.ws_lag:
             print(f"{'live update delay':24s} {len(self.ws_lag):6d} {pct(self.ws_lag, .5):7.0f} {pct(self.ws_lag, .95):7.0f} {max(self.ws_lag):7.0f}")
+        if self.retries:
+            print(f"\n{self.retries} GET(s) retried after the server closed an idle keep-alive connection (browsers do the same)")
 
         problems = [f"{n}x {e}" for e, n in self.errors.items()]
         if self.heats_done < self.heats * len(self.plan["tracks"]):
