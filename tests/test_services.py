@@ -396,14 +396,13 @@ def test_racer_cannot_be_on_two_tracks(settings, engine, demo):
                 nxt = views.plan_all(s)[g.id][0]
                 assert not (views.racers_by_heat(s, [nxt.id])[nxt.id] & busy)
             # and explicitly staging a clashing heat is refused
-            clash = next(
-                h
-                for g in gutters
-                for h in views.scheduled_heats(s, [g.id])[g.id]
+            clash, fit = next(
+                (h, fit)
+                for h, fit in views.scheduled_heats(s, gutters)
                 if views.racers_by_heat(s, [h.id])[h.id] & busy
             )
         with pytest.raises(ServiceError, match="another track"):
-            await svc.stage(clash.track_id, clash.id, ACTOR)
+            await svc.stage(fit[0].id, clash.id, ACTOR)
         await svc.stop()
 
     run(body)

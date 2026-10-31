@@ -6,6 +6,12 @@
       "runtimeExecutable": ".venv/Scripts/racemgr.exe",
       "runtimeArgs": ["serve", "--host", "0.0.0.0", "--port", "8000"],
       "port": 8000
+    },
+    {
+      "name": "racemgr-worktree",
+      "runtimeExecutable": "../../../.venv/Scripts/python.exe",
+      "runtimeArgs": ["-c", "import sys; sys.path.insert(0, 'src'); from racemgr.cli import main; sys.exit(main())", "serve", "--host", "127.0.0.1", "--port", "8001"],
+      "port": 8001
     }
   ]
 }

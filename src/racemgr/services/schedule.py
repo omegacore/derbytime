@@ -18,6 +18,7 @@ from sqlmodel import Session, col, delete, select
 from ..core import scheduler, scoring
 from ..models import (
     ACTIVE,
+    ON_TRACK,
     Entry,
     Event,
     EventStatus,
@@ -387,7 +388,6 @@ def race_order(session: Session, event: Event) -> list[dict[str, Any]]:
 PACE_SAMPLE = 8  # recent heat-to-heat gaps that set a track's measured pace
 PACE_MIN_SAMPLES = 3  # fewer gaps than this: use the configured estimate
 PACE_MAX_GAP = 600.0  # a longer gap is a break, not the racing pace
-REMAINING = (HeatStatus.scheduled, HeatStatus.staged, HeatStatus.armed)
 
 
 def track_pace(session: Session, track_id: int) -> float | None:
@@ -424,23 +424,35 @@ def projected_finish(session: Session, event: Event, heat_seconds: float, now: d
 
     Tracks race in parallel, so the event ends when its slowest track does.
     Each track uses its measured pace once it has one, else `heat_seconds`
-    (configured race time plus overhead).
+    (configured race time plus overhead). Heats on a track now finish there;
+    queued heats are shared out the way the shared queue hands them out, each
+    to whichever track that can race it would get to it first, so a faster
+    track takes more of them.
     """
     now = now or utcnow()
+    tracks = list(session.exec(select(Track).where(Track.event_id == event.id, Track.active == True).order_by(Track.id)))  # noqa: E712
+    measured = {t.id: track_pace(session, t.id) for t in tracks}
+    pace = {t.id: measured[t.id] or heat_seconds for t in tracks}
+    count: Counter = Counter()
+    busy = {t.id: 0.0 for t in tracks}
+    for h in session.exec(select(Heat).where(col(Heat.track_id).in_(list(busy)), col(Heat.status).in_(ON_TRACK))):
+        count[h.track_id] += 1
+        busy[h.track_id] += pace[h.track_id]
+    for _, fit in views.scheduled_heats(session, tracks):
+        t = min(fit, key=lambda t: (busy[t.id] + pace[t.id], t.id))
+        count[t.id] += 1
+        busy[t.id] += pace[t.id]
     rows = []
-    for t in session.exec(select(Track).where(Track.event_id == event.id).order_by(Track.id)):
-        remaining = len(session.exec(select(Heat.id).where(Heat.track_id == t.id, col(Heat.status).in_(REMAINING))).all())
+    for t in tracks:
+        remaining, left = count[t.id], busy[t.id]
         if not remaining:
             continue
-        measured = track_pace(session, t.id)
-        pace = measured or heat_seconds
-        left = remaining * pace
         rows.append(
             {
                 "track": t,
                 "remaining": remaining,
-                "pace": round(pace),
-                "measured": measured is not None,
+                "pace": round(pace[t.id]),
+                "measured": measured[t.id] is not None,
                 "left": _duration(left),
                 "end": _clock(now + timedelta(seconds=left)),
                 "seconds": left,

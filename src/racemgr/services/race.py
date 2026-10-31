@@ -151,6 +151,21 @@ class RaceService:
     def _lanes(s: Session, heat_id: int) -> list[HeatLane]:
         return list(s.exec(select(HeatLane).where(HeatLane.heat_id == heat_id).order_by(HeatLane.lane)))
 
+    @classmethod
+    def _move_heat(cls, s: Session, heat: Heat, track: Track) -> None:
+        """Hand a heat from the shared queue to the track that races it. Cars
+        keep their lane numbers; empty lanes follow the new track's lanes."""
+        usable = set(track.usable_lanes)
+        have = set()
+        for hl in cls._lanes(s, heat.id):
+            if hl.entry_id is None and hl.lane not in usable:
+                s.delete(hl)
+            else:
+                have.add(hl.lane)
+        for lane in sorted(usable - have):
+            s.add(HeatLane(heat_id=heat.id, lane=lane))
+        heat.track_id = track.id
+
     # --- lifecycle -------------------------------------------------------------
 
     async def stage(self, track_id: int, heat_id: int | None, actor: Actor) -> Heat:
@@ -160,13 +175,13 @@ class RaceService:
                 if self.current_heat(s, track_id):
                     raise ServiceError("A heat is already staged on this track.", 409)
                 if heat_id is None:
-                    plan = views.plan_all(s).get(track_id, [])
+                    plan = views.plan_all(s, first=track_id).get(track_id, [])
                     if not plan:
-                        raise ServiceError("No heats left in this track's queue.", 409)
+                        raise ServiceError("No heats left in the queue for this track.", 409)
                     heat = plan[0]
                 else:
                     heat = self._get_heat(s, heat_id)
-                if heat.track_id != track.id or heat.status != HeatStatus.scheduled:
+                if heat.status != HeatStatus.scheduled or track.id not in {t.id for t in views.heat_tracks(s, heat)}:
                     raise ServiceError("That heat can't be staged on this track.", 409)
                 mine = views.racers_by_heat(s, [heat.id])[heat.id]
                 clash = set()
@@ -176,10 +191,13 @@ class RaceService:
                 if clash:
                     names = ", ".join(sorted(l["racer_name"] for l in views.heat_view(s, heat)["lanes"] if l.get("racer_id") in clash))
                     raise ServiceError(f"{names} is racing on another track right now.", 409)
+                moved_from = heat.track_id if heat.track_id != track.id else None
+                if moved_from is not None:
+                    self._move_heat(s, heat, track)
                 heat.status = HeatStatus.staged
                 heat.staged_at = utcnow()
                 s.add(heat)
-                audit(s, actor, "heat.stage", "heat", heat.id)
+                audit(s, actor, "heat.stage", "heat", heat.id, after={"track": track.id, "from_track": moved_from} if moved_from else None)
                 s.commit()
                 self._publish_heat(s, heat, "heat.staged")
         self.publish_tracks()
