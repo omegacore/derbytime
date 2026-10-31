@@ -172,6 +172,8 @@ class Round(SQLModel, table=True):
     # runoff rounds break ties in their parent round
     parent_round_id: Optional[int] = Field(default=None, foreign_key="round.id")
     seq: int = 0
+    # den runs: races per scout in this run; None = one per lane (full rotation)
+    races: Optional[int] = None
     created_at: datetime = Field(default_factory=utcnow)
 
 

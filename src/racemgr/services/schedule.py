@@ -40,6 +40,7 @@ from .views import entry_info
 
 FINAL_SEQ = 1000
 NO_DEN = "Open"
+MAX_RACES = 12  # races per scout in one den run
 
 
 def eligible_entries(session: Session, event_id: int) -> list[tuple[Entry, Racer]]:
@@ -144,9 +145,12 @@ def _build_round_heats(
     """(Re)build the unraced heats of one run.
 
     Raced heats (staged, armed, pending, approved) are kept. Every member is
-    then owed runs up to the run's length: a full lane rotation for a fresh
-    run, or the length the run started with if it's already under way (so all
-    cars in a run race the same number of times, even if a lane broke).
+    then owed runs up to the run's length: the run's chosen races per scout,
+    else a full lane rotation for a fresh run, or the length the run started
+    with if it's already under way (so all cars in a run race the same number
+    of times, even if a lane broke). When the cars don't fill the last heat,
+    it has empty lanes; those aren't timed, so the heat completes as soon as
+    its cars have results.
     """
     heats = list(session.exec(select(Heat).where(Heat.round_id == rnd.id)))
     lanes = views.lanes_for(session, [h.id for h in heats])
@@ -158,7 +162,10 @@ def _build_round_heats(
         return Counter(hl.entry_id for h in hs for hl in lanes[h.id] if hl.entry_id)
 
     planned_before = runs_in(raced + unraced)
-    target = max(planned_before.values(), default=width) if raced else width
+    if rnd.races:
+        target = rnd.races
+    else:
+        target = max(planned_before.values(), default=width) if raced else width
     done = runs_in(raced)
     used: dict[int, Counter] = defaultdict(Counter)
     for h in raced:
@@ -206,13 +213,14 @@ def _round_members(session: Session, rnd: Round, den_map: dict[int | None, list[
     return [e for e, _ in sorted(set(rows), key=lambda r: r[1]) if e not in out]
 
 
-def _new_run(session: Session, event: Event, group_id: int | None, n: int, seq: int) -> Round:
+def _new_run(session: Session, event: Event, group_id: int | None, n: int, seq: int, races: int | None = None) -> Round:
     rnd = Round(
         event_id=event.id,
         name=pass_name(den_name(session, group_id), n),
         kind=RoundKind.group,
         group_id=group_id,
         seq=seq,
+        races=races,
     )
     session.add(rnd)
     session.flush()
@@ -226,10 +234,32 @@ def _active_tracks_or_error(session: Session, event: Event) -> list[Track]:
     return tracks
 
 
-def generate_group_rounds(session: Session, event: Event, actor: Actor, passes: int | None = None) -> list[Round]:
+def _check_races(races: int | None, tracks: list[Track]) -> int | None:
+    """Validated races per scout; None (one per lane) when it equals the lane
+    count, so a fresh run still follows the lanes if one breaks before it races."""
+    if races is None:
+        return None
+    if not 1 <= races <= MAX_RACES:
+        raise ServiceError(f"Races per scout must be between 1 and {MAX_RACES}.")
+    return None if races == max(len(t.usable_lanes) for t in tracks) else races
+
+
+def _den_races(session: Session, event_id: int, group_id: int | None) -> int | None:
+    """Races per scout for a den's next run: as in its latest run, else as in
+    the event's latest run."""
+    runs = group_rounds(session, event_id)
+    latest = max((r for r in runs if r.group_id == group_id), key=lambda r: r.id, default=None)
+    latest = latest or max(runs, key=lambda r: r.id, default=None)
+    return latest.races if latest else None
+
+
+def generate_group_rounds(
+    session: Session, event: Event, actor: Actor, passes: int | None = None, races: int | None = None
+) -> list[Round]:
     """Build every den's runs. Dens are sorted by name (numbers compared
     numerically) and the race order snakes: down the list, back up, …
-    Each run is spread over all of the event's active tracks."""
+    Each run is spread over all of the event's active tracks and races each
+    scout ``races`` times (default: once per lane)."""
     if session.exec(select(Round).where(Round.event_id == event.id)).first():
         raise ServiceError("This event already has a schedule. Use Regenerate to rebuild it.")
     tracks = _active_tracks_or_error(session, event)
@@ -240,18 +270,19 @@ def generate_group_rounds(session: Session, event: Event, actor: Actor, passes: 
         passes = 2
     if not 1 <= passes <= 6:
         raise ServiceError("Runs per den must be between 1 and 6.")
+    races = _check_races(races, tracks)
 
     dens = sorted(by_group, key=lambda gid: scheduler.natural_key(den_name(session, gid)))
     rounds = []
     count: dict[int | None, int] = defaultdict(int)
     for seq, gid in enumerate(scheduler.snake_order(dens, passes), start=1):
         count[gid] += 1
-        rnd = _new_run(session, event, gid, count[gid], seq)
+        rnd = _new_run(session, event, gid, count[gid], seq, races)
         _build_round_heats(session, event, rnd, tracks, by_group[gid])
         rounds.append(rnd)
     event.status = EventStatus.active
     session.add(event)
-    audit(session, actor, "schedule.generate", "event", event.id, after={"order": [r.name for r in rounds]})
+    audit(session, actor, "schedule.generate", "event", event.id, after={"order": [r.name for r in rounds], "races": races})
     return rounds
 
 
@@ -274,9 +305,10 @@ def regenerate(session: Session, event: Event, actor: Actor, reason: str = "") -
     new_dens = sorted((g for g in den_map if g not in per_den), key=lambda g: scheduler.natural_key(den_name(session, g)))
     seq = max((r.seq for r in runs), default=0)
     for gid in new_dens:
+        races = _den_races(session, event.id, gid)
         for n in range(1, max(per_den.values(), default=1) + 1):
             seq += 1
-            rounds_all.append(_new_run(session, event, gid, n, seq))
+            rounds_all.append(_new_run(session, event, gid, n, seq, races))
 
     totals: Counter = Counter()
     for rnd in rounds_all:
@@ -347,14 +379,15 @@ def set_race_order(session: Session, event: Event, round_ids: list[int], actor: 
 
 
 def add_pass(session: Session, event: Event, group_id: int | None, actor: Actor) -> Round:
-    """Append another full run for a den to the end of the race order."""
+    """Append another run for a den to the end of the race order, with as
+    many races per scout as the den's other runs."""
     entries = den_entries(session, event.id).get(group_id)
     if not entries:
         raise ServiceError("That den has no checked-in entries in this event.")
     tracks = _active_tracks_or_error(session, event)
     existing = [r for r in group_rounds(session, event.id) if r.group_id == group_id]
     seq = max((r.seq for r in group_rounds(session, event.id)), default=0) + 1
-    rnd = _new_run(session, event, group_id, len(existing) + 1, seq)
+    rnd = _new_run(session, event, group_id, len(existing) + 1, seq, _den_races(session, event.id, group_id))
     _build_round_heats(session, event, rnd, tracks, entries)
     _sync_runoff_seqs(session, event.id)
     audit(session, actor, "schedule.add_pass", "round", rnd.id, after={"name": rnd.name})

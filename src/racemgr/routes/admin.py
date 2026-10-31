@@ -40,6 +40,7 @@ from ..services.schedule import (
     den_entries,
     den_name,
     event_standings,
+    MAX_RACES,
     generate_group_rounds,
     group_rounds,
     projected_finish,
@@ -130,6 +131,8 @@ def admin_event(event_id: int, request: Request, s: Session = Depends(get_sessio
             "projection": projected_finish(s, ev, td.heat_seconds + td.heat_overhead_seconds) if rounds else None,
             "dens": sorted(((gid, den_name(s, gid)) for gid in den_entries(s, ev.id)), key=lambda d: natural_key(d[1])),
             "default_passes": td.passes_per_den,
+            "default_races": max((len(t.usable_lanes) for t in tracks if t.active), default=td.lane_count),
+            "max_races": MAX_RACES,
             "multi_track": sum(1 for t in tracks if t.active) > 1,
             "sources": REGISTRY,
             "modes": list(ScoringMode),
@@ -271,7 +274,11 @@ async def admin_schedule(event_id: int, request: Request, s: Session = Depends(g
             passes = int(f.get("passes") or request.app.state.settings.type_defaults(ev.type.value).passes_per_den)
         except ValueError:
             raise ServiceError("Runs per den must be a number.")
-        generate_group_rounds(s, ev, auth.actor_for(me), passes)
+        try:
+            races = int(f["races"]) if f.get("races") else None
+        except ValueError:
+            raise ServiceError("Races per scout must be a number.")
+        generate_group_rounds(s, ev, auth.actor_for(me), passes, races)
     return await _schedule_action(request, event_id, s, me, rs, fn, "Schedule generated. The event is now active.")
 
 
