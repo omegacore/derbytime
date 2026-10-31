@@ -12,3 +12,4 @@ config.toml
 # local roster exports (contain family PII)
 *Roster*.csv
 roster2026-27
+.claude/worktrees/
