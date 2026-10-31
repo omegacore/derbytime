@@ -88,7 +88,8 @@
     ws.onclose = () => {
       setConn(false);
       clearInterval(pingTimer);
-      setTimeout(connect, retry);
+      // jittered so a Wi-Fi blip doesn't bring every phone back in the same instant
+      setTimeout(connect, retry * (0.5 + Math.random()));
       retry = Math.min(retry * 2, 10000);
     };
     ws.onerror = () => ws.close();

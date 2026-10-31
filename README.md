@@ -180,6 +180,7 @@ src/racemgr/
 ```
 
 - **Event flow:** every state change goes through `RaceService`, which writes the DB and audit log, then publishes events such as `heat.pending`, `track.state` and `alert`. Each event carries routing keys like `track-3` or `racer-12`. Pages mark panels with `data-live="track-3"`, and `static/live.js` re-fetches a panel's HTMX partial when a matching key arrives. It waits while someone is typing in that panel.
+- **Many viewers, one render:** public partials (`@public_cached`) and shared computations such as standings come from `cache.py`. Every bus event and every non-GET request bumps a data version. Anonymous phones asking for the same URL at the same version share one render, and the first request renders while the rest wait for it. Officials (any device cookie) always get a fresh render. Public panels add `data-jitter` so phones don't all re-fetch in the same instant.
 - **Timing sources** emit `PendingResult`s. A track's `timing_source` picks the class from `timers.REGISTRY`. To add a USB timer, implement `parse_line()` (and optionally `arm_bytes()`) in `timers/usb.py`. `SerialTimerSource` already handles hotplug reconnects, connected/disconnected status, and logging every raw line with a timestamp to `data/serial/track<id>-YYYYMMDD.log`.
 - **Web Push later:** alerts are computed on the server (`services/alerts.py`) and published as bus events keyed by racer. A push sender is one more bus subscriber plus a table of push subscriptions. Push needs HTTPS (see mkcert above).
 - **Auth:** a `JoinToken` (role + optional track/lane, expiry, max uses) is redeemed for an `Official` with a random device cookie. Only its SHA-256 hash is stored. Permissions are in `auth.py`.
@@ -192,6 +193,22 @@ pytest                      # core, services, HTTP/WebSocket and CLI tests
 ```
 
 Tests use a temporary SQLite file and the simulator with a near-zero delay. `core/` is covered exhaustively (lane balance for 1–25 entries × 2–8 lanes, ties, runoffs, finalist cutoffs). The service and HTTP tests run the full stage → arm → pending → approve/edit/re-run lifecycle, phone submissions (idempotent retries, resuming after a restart), cross-track conflicts, QR join and permission scoping, and WebSocket delivery.
+
+### Load testing
+
+`tools/loadtest.py` simulates race day. It races heats on every track: the operator stages, arms and starts, every lane official hits STOP within milliseconds of the others, and the timekeeper approves. Meanwhile 100 simulated family phones keep racer, home and event pages open and live-refresh them exactly like the browser does. It prints latencies and PASS/FAIL (by default: official actions p95 ≤ 1 s, viewer pages p95 ≤ 3 s, no errors). It works on a copy of the database, never the real one, and races the copy's scheduled heats, so set up the event first.
+
+```bash
+# server on this machine
+python tools/loadtest.py local --db racemgr.db
+
+# another machine as the server
+python tools/loadtest.py prepare --db racemgr.db --out lt          # on the server
+racemgr --config lt/config.toml serve --port 8765                  # on the server
+python tools/loadtest.py run --url http://SERVER-IP:8765 --plan lt/plan.json   # from a laptop
+```
+
+`--viewers`, `--heats` and `--gap` (seconds per official step; 8 is about one real heat a minute) scale it up. `--gap 1` is a useful stress test. Run it from a laptop on the event Wi-Fi to test the network as well as the server.
 
 The database schema is created with `create_all`. Until migrations (Alembic) arrive, delete the `.db` file after schema changes during development.
 

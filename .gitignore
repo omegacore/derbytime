@@ -6,6 +6,8 @@ __pycache__/
 *.db-shm
 data/
 config.toml
+# load-test copies (tools/loadtest.py prepare --out lt)
+lt/
 *.pem
 .pytest_cache/
 
@@ -13,3 +15,7 @@ config.toml
 *Roster*.csv
 roster2026-27
 .claude/worktrees/
+
+# orchestration: shared task board and deploy-script server logs
+spec.md
+logs/
