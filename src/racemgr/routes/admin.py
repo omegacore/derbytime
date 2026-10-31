@@ -43,6 +43,7 @@ from ..services.schedule import (
     event_standings,
     generate_group_rounds,
     group_rounds,
+    projected_finish,
     race_order,
     regenerate,
     remove_pass,
@@ -113,6 +114,7 @@ def admin_event(event_id: int, request: Request, s: Session = Depends(get_sessio
     ).all()
     heat_counts = dict(s.exec(select(Heat.track_id, func.count()).group_by(Heat.track_id)).all())
     rounds = s.exec(select(Round).where(Round.event_id == ev.id)).all()
+    td = request.app.state.settings.type_defaults(ev.type.value)
     return render(
         request,
         "admin/event.html",
@@ -125,8 +127,9 @@ def admin_event(event_id: int, request: Request, s: Session = Depends(get_sessio
             "standings": event_standings(s, ev) if rounds else [],
             "order": race_order(s, ev) if rounds else [],
             "problems": schedule_problems(s, ev) if rounds else {},
+            "projection": projected_finish(s, ev, td.heat_seconds + td.heat_overhead_seconds) if rounds else None,
             "dens": sorted(((gid, den_name(s, gid)) for gid in den_entries(s, ev.id)), key=lambda d: natural_key(d[1])),
-            "default_passes": request.app.state.settings.type_defaults(ev.type.value).passes_per_den,
+            "default_passes": td.passes_per_den,
             "multi_track": sum(1 for t in tracks if t.active) > 1,
             "sources": REGISTRY,
             "modes": list(ScoringMode),

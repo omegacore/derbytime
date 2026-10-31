@@ -28,6 +28,11 @@ max_time = 6.0
 dnf_time = 9.999                # time counted for a DNF when averaging
 finalists_per_group = 3
 passes_per_den = 2              # full lane rotations per den; order snakes down then back up
+# projected end time (admin page): seconds per heat for the race itself plus
+# overhead (loading cars, approving results). Used until a track has raced a
+# few heats; after that its measured pace is used instead.
+heat_seconds = 5
+heat_overhead_seconds = 40
 # choices in the Re-run dropdown (operators can also pick "Other" and type one)
 rerun_reasons = [
   "False start / start gate problem",
@@ -48,6 +53,8 @@ max_time = 60.0
 dnf_time = 99.0
 finalists_per_group = 3
 passes_per_den = 2
+heat_seconds = 30
+heat_overhead_seconds = 60
 rerun_reasons = [
   "False start",
   "Boat tipped over or sank",

@@ -24,6 +24,10 @@ class TypeDefaults:
     dnf_time: float
     finalists_per_group: int
     passes_per_den: int = 2
+    # projected end time: assumed seconds per heat (the race itself plus
+    # staging/loading overhead) until a track has measured its own pace
+    heat_seconds: float = 5.0
+    heat_overhead_seconds: float = 40.0
     rerun_reasons: list[str] = field(default_factory=list)
 
 

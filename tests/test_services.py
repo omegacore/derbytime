@@ -18,6 +18,7 @@ from racemgr.services.schedule import (
     event_standings,
     generate_group_rounds,
     group_rounds,
+    projected_finish,
     race_order,
     remove_pass,
     set_race_order,
@@ -473,3 +474,41 @@ def test_standings_final_and_runoff(settings, engine, demo):
         await svc.stop()
 
     run(body)
+
+
+def test_projected_finish_uses_estimate_then_measured_pace(session, demo):
+    from datetime import timedelta
+
+    from racemgr.models import utcnow
+
+    derby, _ = demo
+    track = tracks_of(session, derby)[0]
+    heats = list(session.exec(select(Heat).where(Heat.track_id == track.id).order_by(Heat.seq)))
+    now = utcnow()
+
+    p = projected_finish(session, derby, 45.0, now=now)
+    row = p["tracks"][0]
+    assert row["remaining"] == len(heats) and not row["measured"]
+    assert p["seconds"] == len(heats) * 45.0
+
+    # four heats raced 30 s apart, plus a 20-minute break that is ignored
+    base = now - timedelta(hours=1)
+    for i, h in enumerate(heats[:4]):
+        h.status = HeatStatus.approved
+        h.results_at = base + timedelta(seconds=30 * i + (1200 if i == 3 else 0))
+        session.add(h)
+    h = heats[4]
+    h.status = HeatStatus.approved
+    h.results_at = heats[3].results_at + timedelta(seconds=30)
+    session.add(h)
+    session.commit()
+
+    row = projected_finish(session, derby, 45.0, now=now)["tracks"][0]
+    assert row["measured"] and row["pace"] == 30
+    assert row["remaining"] == len(heats) - 5
+
+    for h in heats:
+        h.status = HeatStatus.approved
+        session.add(h)
+    session.commit()
+    assert projected_finish(session, derby, 45.0, now=now) is None

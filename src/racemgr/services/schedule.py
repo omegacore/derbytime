@@ -8,7 +8,9 @@ den's passes.
 from __future__ import annotations
 
 import random
+import statistics
 from collections import Counter, defaultdict
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlmodel import Session, col, delete, select
@@ -28,6 +30,7 @@ from ..models import (
     Round,
     RoundKind,
     Track,
+    utcnow,
 )
 from . import Actor, ServiceError, views
 from .audit import audit
@@ -377,6 +380,82 @@ def race_order(session: Session, event: Event) -> list[dict[str, Any]]:
             }
         )
     return rows
+
+
+# --- projected end time ------------------------------------------------------
+
+PACE_SAMPLE = 8  # recent heat-to-heat gaps that set a track's measured pace
+PACE_MIN_SAMPLES = 3  # fewer gaps than this: use the configured estimate
+PACE_MAX_GAP = 600.0  # a longer gap is a break, not the racing pace
+REMAINING = (HeatStatus.scheduled, HeatStatus.staged, HeatStatus.armed)
+
+
+def track_pace(session: Session, track_id: int) -> float | None:
+    """Median seconds between recent results on a track, or None if too few.
+
+    The gap between one heat's results and the next covers the race itself and
+    all the overhead around it (approving, loading cars, staging, re-runs).
+    """
+    stamps = list(
+        session.exec(
+            select(Heat.results_at)
+            .where(Heat.track_id == track_id, col(Heat.results_at).is_not(None))
+            .order_by(col(Heat.results_at).desc())
+            .limit(PACE_SAMPLE + 1)
+        )
+    )
+    gaps = [(a - b).total_seconds() for a, b in zip(stamps, stamps[1:])]
+    gaps = [g for g in gaps if 0 < g <= PACE_MAX_GAP]
+    return statistics.median(gaps) if len(gaps) >= PACE_MIN_SAMPLES else None
+
+
+def _clock(dt: datetime) -> str:
+    # the server runs at the event, so its local time is the event's
+    return dt.astimezone().strftime("%I:%M %p").lstrip("0")
+
+
+def _duration(seconds: float) -> str:
+    m = max(1, round(seconds / 60))
+    return f"{m // 60} h {m % 60:02d} min" if m >= 60 else f"{m} min"
+
+
+def projected_finish(session: Session, event: Event, heat_seconds: float, now: datetime | None = None) -> dict[str, Any] | None:
+    """When the event's remaining heats should finish, or None if none remain.
+
+    Tracks race in parallel, so the event ends when its slowest track does.
+    Each track uses its measured pace once it has one, else `heat_seconds`
+    (configured race time plus overhead).
+    """
+    now = now or utcnow()
+    rows = []
+    for t in session.exec(select(Track).where(Track.event_id == event.id).order_by(Track.id)):
+        remaining = len(session.exec(select(Heat.id).where(Heat.track_id == t.id, col(Heat.status).in_(REMAINING))).all())
+        if not remaining:
+            continue
+        measured = track_pace(session, t.id)
+        pace = measured or heat_seconds
+        left = remaining * pace
+        rows.append(
+            {
+                "track": t,
+                "remaining": remaining,
+                "pace": round(pace),
+                "measured": measured is not None,
+                "left": _duration(left),
+                "end": _clock(now + timedelta(seconds=left)),
+                "seconds": left,
+            }
+        )
+    if not rows:
+        return None
+    left = max(r["seconds"] for r in rows)
+    return {
+        "tracks": rows,
+        "remaining": sum(r["remaining"] for r in rows),
+        "seconds": left,
+        "left": _duration(left),
+        "end": _clock(now + timedelta(seconds=left)),
+    }
 
 
 def clear_schedule(session: Session, event: Event, actor: Actor) -> None:

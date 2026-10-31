@@ -98,6 +98,17 @@
       {% if problems.scratched %}<div>No longer checked in but still has heats: {{ problems.scratched | join(', ') }}</div>{% endif %}
     </div>
     {% endif %}
+    {% if projection %}
+    <div class="projection" style="margin-bottom:12px">
+      <div><strong>Projected finish: ~{{ projection.end }}</strong>
+        <span class="small muted">· about {{ projection.left }} left · {{ projection.remaining }} heat{{ '' if projection.remaining == 1 else 's' }} to race</span></div>
+      {% for p in projection.tracks %}
+      <div class="small muted">{{ p.track.name }}: {{ p.remaining }} × {{ p.pace }} s/heat
+        ({{ 'measured pace' if p.measured else 'estimate, until a few heats are raced' }}) → ~{{ p.end }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
     <form class="row" method="post" action="/admin/event/{{ event.id }}/regenerate">
       <input name="reason" placeholder="Reason (optional), e.g. late arrivals" style="flex:1;min-width:12em">
       <button class="{{ 'primary' if problems else '' }}" type="submit">Regenerate remaining heats</button>
