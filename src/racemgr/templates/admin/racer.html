@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}{{ racer.display_name }} · roster{% endblock %}
+{% block content %}
+<p class="small">{% if next %}<a href="{{ next }}">← Back</a> · {% endif %}<a href="/admin/roster">Roster</a> · <a href="/racer/{{ racer.id }}">public page</a></p>
+<h1>{{ racer.display_name }}{% if not racer.active %} <span class="badge">inactive</span>{% endif %}</h1>
+
+<section class="card">
+  <h2>Scout</h2>
+  <form class="stack" method="post" action="/admin/racer/{{ racer.id }}">
+    <input type="hidden" name="next" value="{{ next }}">
+    <div class="row">
+      <label>First name <input name="first_name" value="{{ racer.first_name }}" required></label>
+      <label>Last name <input name="last_name" value="{{ racer.last_name }}"></label>
+      <label>Den <input name="den" value="{{ group.name if group else '' }}" list="den-list" required></label>
+      <label>Member ID <input name="member_id" value="{{ racer.member_id or '' }}" style="width:9em"></label>
+    </div>
+    <label><input type="checkbox" name="active" {% if racer.active %}checked{% endif %}> Active (inactive scouts aren't scheduled in any event)</label>
+    <div><button class="primary" type="submit">Save</button></div>
+  </form>
+  <datalist id="den-list">{% for d in dens %}<option value="{{ d }}">{% endfor %}</datalist>
+  <p class="small muted">The Member ID lets a re-import recognise this scout after a den move or a name fix. A den change applies to schedules when they're regenerated; heats already raced stay with their den.</p>
+</section>
+
+{% for e, ev in entries %}
+<section class="card">
+  <div class="row spread">
+    <h2 style="margin:0">{{ ev.name }}</h2>
+    <span>
+      {% if e.status %}<span class="badge bad">{{ e.status.value }}</span>
+      {% else %}<span class="badge {{ 'ok' if e.checked_in else 'scheduled' }}">{{ 'racing' if e.checked_in else 'not checked in' }}</span>{% endif %}
+      <a class="small" href="/admin/event/{{ ev.id }}">event admin</a>
+    </span>
+  </div>
+  {% if e.status %}<p class="small">{{ e.status.value | capitalize }}{% if e.status_at %} at {{ e.status_at.strftime('%H:%M') }} UTC{% endif %}: {{ e.status_reason }}</p>{% endif %}
+
+  <form class="row" method="post" action="/admin/entry/{{ e.id }}">
+    <input type="hidden" name="next" value="{{ next }}">
+    <label>Car # <input name="number" type="number" min="1" value="{{ e.number }}" style="width:5.5em"></label>
+    <label>Car name <input name="car_name" value="{{ e.name or '' }}"></label>
+    <button type="submit">Save</button>
+  </form>
+
+  <h3>Race status</h3>
+  {% if e.status %}
+  <form class="row" method="post" action="/admin/entry/{{ e.id }}/status" onsubmit="return confirm('Reinstate car #{{ e.number }}? It is scheduled again in the heats still to race.')">
+    <input type="hidden" name="next" value="{{ next }}">
+    <input type="hidden" name="status" value="">
+    <input name="reason" placeholder="Reason (optional)" style="flex:1;min-width:12em">
+    <button class="ok" type="submit">Reinstate</button>
+  </form>
+  {% else %}
+  <form class="stack" method="post" action="/admin/entry/{{ e.id }}/status" onsubmit="return confirm('Change the race status of car #{{ e.number }}?')">
+    <input type="hidden" name="next" value="{{ next }}">
+    <div class="row">
+      <select name="status">
+        <option value="withdrawn">Withdraw: keeps results so far, races no more</option>
+        <option value="disqualified">Disqualify: removed from rankings and finals</option>
+      </select>
+      <input name="reason" required placeholder="Reason, e.g. failed re-inspection" style="flex:1;min-width:12em">
+      <button class="bad" type="submit">Apply</button>
+    </div>
+  </form>
+  <p class="small muted">Their unraced heats are rescheduled right away. A heat already on the track or awaiting approval finishes as is; its results are kept on record. Other cars' heat places and points stay as raced.</p>
+  {% endif %}
+
+  {% if e.id not in raced %}
+  <form method="post" action="/admin/entry/{{ e.id }}/remove" onsubmit="return confirm('Remove car #{{ e.number }} from this event?')" style="margin-top:8px">
+    <input type="hidden" name="next" value="{{ next }}">
+    <button class="small" type="submit">Remove from this event</button> <span class="small muted">(only until the car has raced)</span>
+  </form>
+  {% endif %}
+</section>
+{% endfor %}
+
+{% if events %}
+<section class="card">
+  <h2>Enter in an event</h2>
+  <form class="row" method="post" action="/admin/racer/{{ racer.id }}/enter">
+    <select name="event_id">{% for ev in events %}<option value="{{ ev.id }}">{{ ev.name }}</option>{% endfor %}</select>
+    <input name="number" type="number" min="1" placeholder="Car # (auto)" style="width:8em">
+    <input name="car_name" placeholder="Car name">
+    <label><input type="checkbox" name="checked_in"> Checked in</label>
+    <button type="submit">Enter</button>
+  </form>
+</section>
+{% endif %}
+
+<section class="card">
+  <h2>Duplicate or mistake?</h2>
+  {% if others %}
+  <form class="row" method="post" action="/admin/racer/{{ racer.id }}/merge" onsubmit="return confirm('Merge into the selected scout? This scout is deleted and their entries move over.')">
+    <label>Merge into
+      <select name="target_id">{% for o in others %}<option value="{{ o.id }}">{{ o.display_name }}</option>{% endfor %}</select>
+    </label>
+    <button type="submit">Merge</button>
+  </form>
+  {% endif %}
+  {% if not entries %}
+  <form method="post" action="/admin/racer/{{ racer.id }}/delete" onsubmit="return confirm('Delete this scout?')" style="margin-top:8px">
+    <button class="bad" type="submit">Delete scout</button>
+  </form>
+  {% else %}
+  <p class="small muted">A scout with event entries can't be deleted. Mark them inactive instead.</p>
+  {% endif %}
+</section>
+{% endblock %}

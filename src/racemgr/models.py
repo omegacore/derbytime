@@ -41,6 +41,13 @@ class InspectionStatus(str, Enum):
     failed = "failed"
 
 
+class EntryStatus(str, Enum):
+    """Why an entry stopped racing mid-event (None on the entry = racing)."""
+
+    withdrawn = "withdrawn"  # left or car broke: keeps results so far, races no more
+    disqualified = "disqualified"  # removed from the rankings; results stay on record
+
+
 class RoundKind(str, Enum):
     group = "group"
     final = "final"
@@ -96,11 +103,19 @@ class Racer(SQLModel, table=True):
     first_name: str
     last_name: str = ""
     group_id: Optional[int] = Field(default=None, foreign_key="group.id")
+    # pack roster Member ID: the stable key for matching re-imports
+    member_id: Optional[str] = Field(default=None, index=True)
+    # set when the roster stops listing the scout as Active; None = active
+    inactive_since: Optional[datetime] = None
     created_at: datetime = Field(default_factory=utcnow)
 
     @property
     def display_name(self) -> str:
         return f"{self.first_name} {self.last_name}".strip()
+
+    @property
+    def active(self) -> bool:
+        return self.inactive_since is None
 
 
 class Entry(SQLModel, table=True):
@@ -121,6 +136,10 @@ class Entry(SQLModel, table=True):
     inspection_notes: Optional[str] = None
     # check-in photo of the car or boat: a file name under <data_dir>/photos
     photo_path: Optional[str] = None
+    # withdrawn / disqualified during the event; None = racing
+    status: Optional[EntryStatus] = None
+    status_reason: Optional[str] = None
+    status_at: Optional[datetime] = None
 
 
 class Track(SQLModel, table=True):

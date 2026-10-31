@@ -7,6 +7,7 @@
   </div>
   {% set photo = vehicle_photo(b.entry) %}
   {% if photo %}<img class="vehicle-photo" src="{{ photo }}" alt="{{ 'Boat' if b.event.type.value == 'regatta' else 'Car' }} #{{ b.entry.number }}" loading="lazy">{% endif %}
+  {% if b.entry.status %}<p><span class="badge bad">{{ b.entry.status.value }}</span></p>{% endif %}
   {% if b.rank %}<p>Rank <strong>{{ b.rank[1] }}</strong> of {{ b.rank[2] }} in {{ b.rank[0] }}</p>{% endif %}
   <div class="table-wrap">
   <table>

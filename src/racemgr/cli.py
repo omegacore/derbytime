@@ -74,6 +74,22 @@ def cmd_admin_url(args, settings) -> int:
     return 0
 
 
+def cmd_backup(args, settings) -> int:
+    from datetime import datetime
+
+    from .services.export import backup_db
+
+    engine = make_engine(settings.db_path)
+    dest = Path(args.path) if args.path else Path(settings.data_dir) / "backups" / f"racemgr-{datetime.now():%Y%m%d-%H%M%S}.db"
+    if dest.exists() and not args.force:
+        print(f"{dest} already exists (use --force to overwrite).")
+        return 1
+    dest.unlink(missing_ok=True)
+    backup_db(engine, dest)
+    print(f"Backed up {settings.db_path} to {dest}")
+    return 0
+
+
 def cmd_init_config(args, settings) -> int:
     dest = Path(args.path)
     if dest.exists() and not args.force:
@@ -108,6 +124,11 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--port", type=int)
     s.add_argument("--https", action="store_true", help="link uses https://")
     s.set_defaults(fn=cmd_admin_url)
+
+    s = sub.add_parser("backup", help="copy the database (safe while the server runs)")
+    s.add_argument("path", nargs="?", help="destination file (default: <data_dir>/backups/racemgr-<time>.db)")
+    s.add_argument("--force", action="store_true")
+    s.set_defaults(fn=cmd_backup)
 
     s = sub.add_parser("init-config", help="write an example config.toml")
     s.add_argument("path", nargs="?", default="config.toml")

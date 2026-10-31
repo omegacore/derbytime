@@ -58,6 +58,8 @@ def add_missing_columns(engine: Engine) -> list[str]:
                 coltype = column.type.compile(dialect=engine.dialect)
                 conn.exec_driver_sql(f'ALTER TABLE "{table.name}" ADD COLUMN "{column.name}" {coltype}')
                 added.append(f"{table.name}.{column.name}")
+            for index in table.indexes:  # indexes on columns added above
+                index.create(conn, checkfirst=True)
     return added
 
 

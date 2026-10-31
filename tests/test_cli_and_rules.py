@@ -46,6 +46,12 @@ def test_cli_init_seed_admin_url(tmp_path, monkeypatch, capsys):
         assert s.exec(select(func.count()).select_from(Entry)).one() == 40
         assert s.exec(select(JoinToken)).first().role.value == "admin"
 
+    copy = tmp_path / "copy.db"
+    assert main(["--config", str(cfg), "backup", str(copy)]) == 0
+    assert main(["--config", str(cfg), "backup", str(copy)]) == 1  # won't overwrite
+    with Session(make_engine(copy)) as s:
+        assert s.exec(select(func.count()).select_from(Entry)).one() == 40
+
 
 def test_config_overrides(tmp_path):
     cfg = tmp_path / "c.toml"
