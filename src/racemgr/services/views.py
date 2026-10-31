@@ -80,8 +80,8 @@ def lanes_for(session: Session, heat_ids: list[int]) -> dict[int, list[HeatLane]
 
 def heat_views(session: Session, heats: list[Heat], track_id: int | None = None) -> list[dict[str, Any]]:
     """Snapshots of heats. ``track_id`` shows them as raced on that track
-    (for a ``plan_all`` forecast); otherwise a den run still in the shared
-    queue is shown as going to the next free track."""
+    (for that track's ``plan_all`` queue); otherwise a den run still in the
+    shared queue is shown as going to the next free track."""
     if not heats:
         return []
     lanes = lanes_for(session, [h.id for h in heats])
@@ -236,12 +236,13 @@ def on_track_racers(session: Session) -> dict[int, set[int]]:
     return out
 
 
-def plan_all(session: Session, limit: int | None = None, first: int | None = None) -> dict[int, list[Heat]]:
-    """Forecast of every active track's upcoming heats; index 0 is the next
-    heat to stage. Den runs share one queue per event, so these lists show
-    where heats are expected to go, and a heat's ``track_id`` is only fixed
-    when a track stages it. ``first`` gives one track first pick (the track
-    asking to stage now).
+def plan_all(session: Session, limit: int | None = None) -> dict[int, list[Heat]]:
+    """Every active track's queue; index 0 is the heat it would stage next.
+
+    Den runs share one queue per event, so every track of the event lists the
+    same heats in the same order (minus any it can't race) and whichever track
+    is free first takes the front one. A heat's ``track_id`` is only fixed
+    when a track stages it.
 
     Planning is global (all active events) because racers are shared across
     events: a scout racing a car can't simultaneously sail a boat.
@@ -250,7 +251,7 @@ def plan_all(session: Session, limit: int | None = None, first: int | None = Non
     sched = scheduled_heats(session, tracks)
     rbh = racers_by_heat(session, [h.id for h, _ in sched])
     queue = [QueuedHeat.of(h.id, rbh[h.id], (t.id for t in fit)) for h, fit in sched]
-    planned = plan_tracks(queue, [t.id for t in tracks], on_track_racers(session), first=first)
+    planned = plan_tracks(queue, [t.id for t in tracks], on_track_racers(session))
     by_id = {h.id: h for h, _ in sched}
     out = {}
     for tid, q in planned.items():

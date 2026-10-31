@@ -58,11 +58,24 @@ class AlertService:
             for lane in heat["lanes"]:
                 if not lane["bye"]:
                     self._send("racing", heat, lane)
-        for track_id, heats in views.plan_all(session, limit=2).items():
-            for kind, hv in zip(("on_deck", "two_away"), views.heat_views(session, heats, track_id=track_id)):
-                for lane in hv["lanes"]:
-                    if not lane["bye"]:
-                        self._send(kind, hv, lane)
+        for kind, hv in self._up_next(session):
+            for lane in hv["lanes"]:
+                if not lane["bye"]:
+                    self._send(kind, hv, lane)
+
+    @staticmethod
+    def _up_next(session: Session) -> list[tuple[str, dict[str, Any]]]:
+        """(kind, heat) for heats that are on deck (some track's next heat)
+        or two away (the one after). Heats in the shared queue go to whichever
+        track is free first, so they're shown as "Next free track"."""
+        plan = views.plan_all(session, limit=2)
+        picked: dict[int, tuple[str, Heat]] = {}
+        for pos, kind in enumerate(("on_deck", "two_away")):
+            for heats in plan.values():
+                if len(heats) > pos:
+                    picked.setdefault(heats[pos].id, (kind, heats[pos]))
+        kinds = [kind for kind, _ in picked.values()]
+        return list(zip(kinds, views.heat_views(session, [h for _, h in picked.values()])))
 
     def results(self, session: Session, heat: Heat) -> None:
         hv = views.heat_view(session, heat)
@@ -81,9 +94,8 @@ class AlertService:
             for lane in heat["lanes"]:
                 if not lane["bye"] and (racer_ids is None or lane["racer_id"] in racer_ids):
                     out[lane["racer_id"]] = {"kind": "racing", "track_name": heat["track_name"], "heat_number": heat["number"], "lane": lane["lane"]}
-        for track_id, heats in views.plan_all(session, limit=2).items():
-            for kind, hv in zip(("on_deck", "two_away"), views.heat_views(session, heats, track_id=track_id)):
-                for lane in hv["lanes"]:
-                    if not lane["bye"] and (racer_ids is None or lane["racer_id"] in racer_ids) and lane["racer_id"] not in out:
-                        out[lane["racer_id"]] = {"kind": kind, "track_name": hv["track_name"], "heat_number": hv["number"], "lane": lane["lane"]}
+        for kind, hv in self._up_next(session):
+            for lane in hv["lanes"]:
+                if not lane["bye"] and (racer_ids is None or lane["racer_id"] in racer_ids) and lane["racer_id"] not in out:
+                    out[lane["racer_id"]] = {"kind": kind, "track_name": hv["track_name"], "heat_number": hv["number"], "lane": lane["lane"]}
         return out
