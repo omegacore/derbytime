@@ -7,7 +7,6 @@ from racemgr.core.scheduler import (
     is_blocked,
     lane_rotation,
     natural_key,
-    pick_next,
     plan_run,
     plan_tracks,
     snake_order,
@@ -173,35 +172,66 @@ def test_plan_run_nothing_needed_and_bad_input():
         plan_run(["a"], [[]])
 
 
-def test_pick_next_skips_busy_racers():
-    q = [QueuedHeat.of(1, [1, 2]), QueuedHeat.of(2, [3, 4]), QueuedHeat.of(3, [5, None])]
-    assert pick_next(q, busy={1}) == 1
-    assert pick_next(q, busy={1, 3}) == 2
-    assert pick_next(q, busy={1, 3, 5}) is None
-    # soft conflicts are avoided when possible, otherwise accepted
-    assert pick_next(q, busy=set(), soft_busy={1}) == 1
-    assert pick_next(q[:1], busy=set(), soft_busy={1}) == 0
+def ids(plan):
+    return {t: [h.heat_id for h in q] for t, q in plan.items()}
+
+
+def test_plan_tracks_shares_one_queue():
+    q = [QueuedHeat.of(h, [h]) for h in range(1, 7)]
+    # both free: tracks take turns from the front of the queue
+    assert ids(plan_tracks(q, [1, 2], on_track={})) == {1: [1, 3, 5], 2: [2, 4, 6]}
+    # track 1 still racing: free track 2 takes the front heat
+    assert ids(plan_tracks(q, [1, 2], on_track={1: {99}}))[2][0] == 1
+    # the track asking to stage gets first pick
+    assert ids(plan_tracks(q, [1, 2], on_track={}, first=2))[2][0] == 1
+
+
+def test_plan_tracks_slow_track_doesnt_hold_others_up():
+    q = [QueuedHeat.of(h, [h]) for h in range(1, 7)]
+    # track 1 is still racing heat 1; track 2 is free and takes heat 3...
+    assert ids(plan_tracks(q[2:], [1, 2], on_track={1: {1}}))[2][0] == 3
+    # ...races it, and is back before track 1 is done: it takes heat 4 too
+    assert ids(plan_tracks(q[3:], [1, 2], on_track={1: {1}}, first=2))[2][0] == 4
 
 
 def test_plan_tracks_never_puts_racer_on_two_tracks():
-    queues = {
-        1: [QueuedHeat.of(10, [1, 2]), QueuedHeat.of(11, [3, 4])],
-        2: [QueuedHeat.of(20, [1, 5]), QueuedHeat.of(21, [6, 7])],
-    }
+    q = [QueuedHeat.of(10, [1, 2]), QueuedHeat.of(11, [3, 4]), QueuedHeat.of(12, [5, 6])]
     # racer 1 is racing on track 1 right now
-    plan = plan_tracks(queues, on_track={1: {1, 9}, 2: set()})
-    assert plan[2][0].heat_id == 21
+    plan = plan_tracks(q, [1, 2], on_track={1: {1, 9}})
+    assert plan[2][0].heat_id == 11
     assert plan[1][0].heat_id == 10  # own track: no conflict with itself
 
 
-def test_plan_tracks_avoids_on_deck_clash():
-    queues = {
-        1: [QueuedHeat.of(10, [1, 2])],
-        2: [QueuedHeat.of(20, [1, 5]), QueuedHeat.of(21, [6, 7])],
-    }
-    plan = plan_tracks(queues, on_track={})
-    assert plan[1][0].heat_id == 10
-    assert plan[2][0].heat_id == 21  # racer 1 is on deck on track 1
+def test_plan_tracks_avoids_racing_same_scout_side_by_side():
+    q = [QueuedHeat.of(10, [1, 2]), QueuedHeat.of(11, [1, 5]), QueuedHeat.of(12, [6, 7])]
+    plan = plan_tracks(q, [1, 2], on_track={})
+    assert ids(plan) == {1: [10, 11], 2: [12]}
+
+
+def test_plan_tracks_other_event_forecast_keeps_race_order():
+    # the same scouts in a derby (tracks 1, 2) and a regatta (track 3) that hasn't started
+    derby = [QueuedHeat.of(h, [h], tracks=[1, 2]) for h in (1, 2, 3, 4)]
+    regatta = [QueuedHeat.of(10 + h, [h], tracks=[3]) for h in (2, 4)]
+    plan = plan_tracks(regatta + derby, [1, 2, 3], on_track={})
+    assert ids(plan) == {1: [1, 3], 2: [2, 4], 3: [12, 14]}
+    # but a scout actually racing elsewhere is never planned next
+    plan = plan_tracks(regatta + derby, [1, 2, 3], on_track={3: {2}})
+    assert ids(plan)[1][0] == 1 and ids(plan)[2][0] == 3
+
+
+def test_plan_tracks_respects_allowed_tracks():
+    q = [QueuedHeat.of(10, [1], tracks=[1]), QueuedHeat.of(11, [2], tracks=[1]), QueuedHeat.of(12, [3])]
+    plan = plan_tracks(q, [1, 2], on_track={})
+    assert ids(plan) == {1: [10, 11], 2: [12]}
+    # a heat no planned track can race is left out
+    assert ids(plan_tracks([QueuedHeat.of(10, [1], tracks=[3])], [1, 2], on_track={})) == {1: [], 2: []}
+
+
+def test_plan_tracks_blocked_heat_still_listed():
+    # racer 1 is on a track outside the plan (another event's switched-off track)
+    q = [QueuedHeat.of(10, [1], tracks=[1]), QueuedHeat.of(11, [2], tracks=[1])]
+    plan = plan_tracks(q, [1], on_track={5: {1}})
+    assert ids(plan) == {1: [11, 10]}
 
 
 def test_is_blocked():

@@ -58,8 +58,8 @@ class AlertService:
             for lane in heat["lanes"]:
                 if not lane["bye"]:
                     self._send("racing", heat, lane)
-        for heats in views.plan_all(session, limit=2).values():
-            for kind, hv in zip(("on_deck", "two_away"), views.heat_views(session, heats)):
+        for track_id, heats in views.plan_all(session, limit=2).items():
+            for kind, hv in zip(("on_deck", "two_away"), views.heat_views(session, heats, track_id=track_id)):
                 for lane in hv["lanes"]:
                     if not lane["bye"]:
                         self._send(kind, hv, lane)
@@ -81,8 +81,8 @@ class AlertService:
             for lane in heat["lanes"]:
                 if not lane["bye"] and (racer_ids is None or lane["racer_id"] in racer_ids):
                     out[lane["racer_id"]] = {"kind": "racing", "track_name": heat["track_name"], "heat_number": heat["number"], "lane": lane["lane"]}
-        for heats in views.plan_all(session, limit=2).values():
-            for kind, hv in zip(("on_deck", "two_away"), views.heat_views(session, heats)):
+        for track_id, heats in views.plan_all(session, limit=2).items():
+            for kind, hv in zip(("on_deck", "two_away"), views.heat_views(session, heats, track_id=track_id)):
                 for lane in hv["lanes"]:
                     if not lane["bye"] and (racer_ids is None or lane["racer_id"] in racer_ids) and lane["racer_id"] not in out:
                         out[lane["racer_id"]] = {"kind": kind, "track_name": hv["track_name"], "heat_number": hv["number"], "lane": lane["lane"]}

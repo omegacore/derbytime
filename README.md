@@ -5,7 +5,7 @@ It runs on a laptop now, and later on a Raspberry Pi acting as an offline Wi-Fi 
 Phones on the same network are the officials' controllers and the families' live scoreboard.
 
 - Lane-balanced heats (every car/boat runs every lane once), raced by den, plus a final and tie-break runoffs
-- Several tracks at once, with a shared scheduler that never puts a scout on two tracks at the same moment (racers are shared across events, so this covers a derby and a regatta running side by side)
+- Several tracks at once, fed from one shared queue: whichever track is free races the next heat, so a slow track never holds the others up. The scheduler never puts a scout on two tracks at the same moment (racers are shared across events, so this covers a derby and a regatta running side by side)
 - Timing sources: simulator, phone stopwatches for regatta lane officials, and USB timers (interface only in phase 1)
 - Every result is **pending** until the head timekeeper approves, edits (a reason is required) or calls a re-run. Every change is audit-logged.
 - Officials join by scanning a QR code. Viewers need no login and can follow racers for in-page alerts.
@@ -131,9 +131,9 @@ Lookup order for the config file: `--config PATH`, then `$RACEMGR_CONFIG`, then 
 2. **Check-in** (`/checkin`): mark scouts checked in, record weight and pass/fail inspection. Only checked-in entries that haven't failed inspection are scheduled. You can also tick "mark checked in" on import.
 3. **Schedule**: on the event's admin page, *Generate schedule* gives every den **runs**. A run is one full lane rotation: every car runs every lane once. The number of runs per den is set on that form (default `passes_per_den = 2` in config).
    - **Default order:** dens are sorted by name with numbers compared numerically (Den 2 before Den 10). The order snakes down the list and back up, e.g. Den 1, Den 2, Den 3, Den 3 · run 2, Den 2 · run 2, Den 1 · run 2.
-   - **Race order list:** drag ☰ (works on touch) or use ↑ ↓ to rearrange at any time, including mid-event. The track queues update immediately.
+   - **Race order list:** drag ☰ (works on touch) or use ↑ ↓ to rearrange at any time, including mid-event. The shared queue updates immediately.
    - **Add or remove runs:** *Add a run* appends another rotation for a den. ✕ removes a run that hasn't started. *Reverse order* flips the list.
-   - **Tracks:** every run is spread across all active tracks (heats alternate between them), so a den finishes quickly and the order you set is the order that races.
+   - **Tracks:** den runs go into one **shared queue** for all of the event's active tracks. When a track's operator presses *Stage next*, that track takes the earliest heat in the queue it can race, so if one track runs slow, the others keep going and take up the slack. A den finishes quickly and the order you set is the order that races. A heat is tied to a track only once it's staged (*Unstage* puts it back in the shared queue); until then schedules show it as "Next free track", and each track's on-deck list is a forecast. A heat is skipped for a track that's missing one of its lanes (e.g. a broken lane), and never staged while one of its scouts is racing on another track.
    - **Standings and finals:** standings combine all of a den's runs. Finals and runoffs stay on one track.
    - **Regenerate any time:** *Regenerate remaining heats* rebuilds every unraced heat from the current check-ins, tracks and working lanes. Heats that have raced, are on the track, or are awaiting approval keep their results. A late arrival gets a full set of runs, and a scratched scout's remaining heats are dropped. A run already under way keeps its length, so every car in it races the same number of times. The admin page warns when check-ins have changed since the schedule was built.
    - **Lanes and tracks:** untick a broken lane (*Lanes in use*), change a lane count, switch a track off, or add a track (another gutter). Unraced heats are rescheduled automatically.
@@ -147,9 +147,9 @@ Lookup order for the config file: `--config PATH`, then `$RACEMGR_CONFIG`, then 
      - **Clock sync:** phones sync their clocks to the server, typically within a few hundredths of a second on local Wi-Fi.
    - **Starting a heat:** any of the three can press START: the operator or either lane official. Everyone's screen shows who started it ("Started by Lane 2") with the clock running. Later presses are discarded.
    - **Disarm** (bad start, boats not ready): the heat goes back to *staged* and every lane phone resets. **Unstage** sends a staged heat back to the queue.
-   - **Re-run** only appears once the race has started: a regatta heat after START, a derby heat once armed. It voids the attempt and puts the same lineup straight back on the track, staged and disarmed, and every lane phone resets. From the timekeeper page, if the track has already moved on, the re-run goes to the front of the queue instead.
+   - **Re-run** only appears once the race has started: a regatta heat after START, a derby heat once armed. It voids the attempt and puts the same lineup straight back on the track, staged and disarmed, and every lane phone resets. From the timekeeper page, if the track has already moved on, the re-run goes to the front of the shared queue instead.
    - Lane officials (`/track/{id}/lane/{n}`): big START/STOP button with Resume (undo an accidental STOP)/Submit/DNF. If a submission can't reach the server, it's kept on the phone and retried on reconnect. The official's own START press goes with it.
-   - Head timekeeper (`/timekeeper`): approve, edit (reason required) or re-run. Times outside the track's min/max are flagged. A re-run goes to the front of that track's queue.
+   - Head timekeeper (`/timekeeper`): approve, edit (reason required) or re-run. Times outside the track's min/max are flagged. A re-run goes to the front of the shared queue.
    - **Re-run reasons:** pick one from a dropdown (or *Other…* to type one). The lists are per event type in `config.toml` (`rerun_reasons`).
 6. **Ties and finals**: tied scores at a den's finalist cutoff (or within the top 3 of the final) show an *Add runoff* button. The runoff's result breaks the tie. *Create final* takes the top N per den (set per event).
 
