@@ -1,0 +1,6 @@
+# Store text files with LF whatever line endings an editor writes, so
+# Windows checkouts do not turn every edited file into a whole-file diff.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.db binary
