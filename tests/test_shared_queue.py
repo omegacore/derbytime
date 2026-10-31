@@ -149,7 +149,7 @@ def test_queued_den_heats_show_next_free_track(settings, session):
     ev, (a, b) = two_track_event(session, settings)
     heat = views.plan_all(session)[b.id][0]
     assert views.heat_view(session, heat)["track_name"] == "Next free track"
-    # the forecast for a track names that track
+    # shown in a track's own queue, it names that track
     (hv,) = views.heat_views(session, [heat], track_id=b.id)
     assert hv["track_name"] == b.name
     # with one track there's nothing to share
@@ -186,3 +186,24 @@ def test_projected_finish_shares_queue_by_pace(settings, session):
     assert ra["remaining"] + rb["remaining"] == left
     assert abs(ra["remaining"] - 2 * rb["remaining"]) <= 2
     assert p["seconds"] == max(ra["seconds"], rb["seconds"])
+
+
+def test_every_track_lists_the_same_queue(settings, session):
+    ev, (a, b) = two_track_event(session, settings)
+    plan = views.plan_all(session)
+    queue = [h.id for h, _ in views.scheduled_heats(session, [a, b])]
+    assert [h.id for h in plan[a.id]] == [h.id for h in plan[b.id]] == queue
+    st = views.track_state(session, b)
+    assert [hv["id"] for hv in st["upcoming"]] == queue[:3]
+    assert st["remaining"] == len(queue)
+
+
+def test_follow_alerts_use_the_shared_queue(settings, session):
+    from racemgr.services.alerts import AlertService
+
+    ev, (a, b) = two_track_event(session, settings)
+    queue = [h.id for h, _ in views.scheduled_heats(session, [a, b])]
+    up = AlertService._up_next(session)
+    # both tracks would take heat 1 next, so it's on deck once, then heat 2
+    assert [(kind, hv["id"]) for kind, hv in up] == [("on_deck", queue[0]), ("two_away", queue[1])]
+    assert {hv["track_name"] for _, hv in up} == {"Next free track"}

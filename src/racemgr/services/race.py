@@ -175,7 +175,7 @@ class RaceService:
                 if self.current_heat(s, track_id):
                     raise ServiceError("A heat is already staged on this track.", 409)
                 if heat_id is None:
-                    plan = views.plan_all(s, first=track_id).get(track_id, [])
+                    plan = views.plan_all(s).get(track_id, [])
                     if not plan:
                         raise ServiceError("No heats left in the queue for this track.", 409)
                     heat = plan[0]

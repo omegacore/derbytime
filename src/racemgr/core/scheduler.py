@@ -78,8 +78,8 @@ def plan_run(
 
     Heats alternate between tracks in order, so a den is raced on all tracks
     at once and finishes before the next run starts. (The track is only where
-    a heat's lanes come from: den runs share one queue and any free track
-    with those lanes can race it, see ``plan_tracks``.) When every track has the
+    a heat's lanes come from: den runs share one queue and any track with
+    those lanes can race it, see ``plan_tracks``.) When every track has the
     same number of usable lanes and the run is fresh, the classic rotation is
     used (every entry runs every lane exactly once). Otherwise heats are filled
     greedily: entries who are owed the most and have rested longest go first,
@@ -214,64 +214,26 @@ class QueuedHeat:
         return not self.tracks or track_id in self.tracks
 
 
-def plan_tracks(
-    queue: Sequence[QueuedHeat],
-    track_ids: Sequence[int],
-    on_track: Mapping[int, set[int]],
-    first: int | None = None,
-) -> dict[int, list[QueuedHeat]]:
-    """Shared scheduler: one queue feeding every track.
+def plan_tracks(queue: Sequence[QueuedHeat], track_ids: Sequence[int], on_track: Mapping[int, set[int]]) -> dict[int, list[QueuedHeat]]:
+    """One queue for every track.
 
     ``queue``: every scheduled heat in race order, each saying which tracks
     may run it. ``on_track``: track id -> racers staged/armed there now.
 
-    Returns a forecast of each track's upcoming heats; index 0 is the heat it
-    stages next. Tracks take turns (``first``, e.g. the track asking to stage
-    now, then free tracks, then busy ones) and each takes the earliest heat it
-    can run whose racers aren't on another track right now. The forecast is
-    only a guide: whichever track is free next takes the front of the queue,
-    so a slow track never holds the others up. A racer on track A is never
-    planned next on track B, and within the next few heats a track prefers
-    one that doesn't share racers with what the other tracks were just given.
+    Each track's list is that same queue (the heats it can run), so every
+    track sees every heat and whichever is free first takes the front one; a
+    slow track never holds the others up. The one change per track: if the
+    front heat has a racer on another track right now, the first heat that
+    doesn't is moved to the front, since that's the one the track would stage.
     """
-    plan: dict[int, list[QueuedHeat]] = {t: [] for t in track_ids}
-    # racers on tracks outside this plan (e.g. switched off) stay busy throughout
-    elsewhere: set[int] = set().union(*(r for t, r in on_track.items() if t not in plan))
-    left = [h for h in queue if any(h.fits(t) for t in track_ids)]
-    # racing now (a hard conflict until that track moves on) ...
-    racing = {t: set(on_track.get(t, ())) for t in track_ids}
-    # ... and the heat each track was just given in the forecast (a soft one)
-    given: dict[int, set[int]] = {t: set() for t in track_ids}
-    turn = sorted(track_ids, key=lambda t: (t != first, bool(racing[t]), t))
-    lookahead = len(track_ids)
-    idle_turns = 0
-    # after one turn where nobody gets a heat every track is free, so a second
-    # one means only heats blocked by ``elsewhere`` racers are left
-    while left and idle_turns < 2:
-        placed = False
-        for t in turn:
-            others = [o for o in track_ids if o != t]
-            hard = elsewhere.union(*(racing[o] for o in others))
-            ok = [i for i, h in enumerate(left) if h.fits(t) and not h.racer_ids & hard]
-            # whatever it's racing now is done before its next heat starts
-            racing[t] = set()
-            if not ok:
-                given[t] = set()  # sits this turn out
-                continue
-
-            def side_by_side(h: QueuedHeat) -> bool:
-                # only tracks sharing this heat's queue: another event's
-                # forecast shouldn't reshuffle this one's race order
-                return any(h.racer_ids & given[o] for o in others if h.fits(o))
-
-            idx = next((i for i in ok[:lookahead] if not side_by_side(left[i])), ok[0])
-            heat = left.pop(idx)
-            plan[t].append(heat)
-            given[t] = set(heat.racer_ids)
-            placed = True
-        idle_turns = 0 if placed else idle_turns + 1
-    for heat in left:
-        plan[next(t for t in turn if heat.fits(t))].append(heat)
+    plan: dict[int, list[QueuedHeat]] = {}
+    for t in track_ids:
+        busy: set[int] = set().union(*(r for o, r in on_track.items() if o != t))
+        mine = [h for h in queue if h.fits(t)]
+        idx = next((i for i, h in enumerate(mine) if not h.racer_ids & busy), None)
+        if idx:
+            mine.insert(0, mine.pop(idx))
+        plan[t] = mine
     return plan
 
 
