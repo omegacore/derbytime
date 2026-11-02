@@ -268,3 +268,7 @@ The database schema is created with `create_all`. New nullable columns (and thei
 
 - Phase 2: MicroWizard / Champ / Arduino gate parsers
 - Later: awards and voting, Pi access-point setup, Web Push, Alembic migrations
+
+## License
+
+MIT. See [LICENSE](LICENSE).
