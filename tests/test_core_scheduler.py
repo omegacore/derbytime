@@ -2,7 +2,7 @@ from collections import Counter
 
 import pytest
 
-from racemgr.core.scheduler import (
+from derbytime.core.scheduler import (
     QueuedHeat,
     is_blocked,
     lane_rotation,

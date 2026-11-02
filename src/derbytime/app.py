@@ -21,7 +21,7 @@ from .services import ServiceError
 from .services.race import RaceService
 from .ws import WebSocketHub
 
-log = logging.getLogger("racemgr")
+log = logging.getLogger("derbytime")
 HERE = Path(__file__).parent
 
 

@@ -11,7 +11,7 @@ event (roster, tracks, schedule) before testing.
 
     # Test another machine as the server:
     #   on the server:   python tools/loadtest.py prepare --db racemgr.db --out lt
-    #                    racemgr --config lt/config.toml serve --port 8765
+    #                    derbytime --config lt/config.toml serve --port 8765
     #   from any laptop: python tools/loadtest.py run --url http://SERVER-IP:8765 --plan lt/plan.json
 
 Simulated phones behave like static/live.js and static/follow.js: one
@@ -44,9 +44,9 @@ def prepare(db: Path, out: Path, port: int) -> Path:
     """Copy ``db`` into ``out`` and write config.toml + plan.json there."""
     from sqlmodel import Session, select
 
-    from racemgr import auth
-    from racemgr.db import init_db, make_engine
-    from racemgr.models import Entry, Event, EventStatus, Role, Track
+    from derbytime import auth
+    from derbytime.db import init_db, make_engine
+    from derbytime.models import Entry, Event, EventStatus, Role, Track
 
     out.mkdir(parents=True, exist_ok=True)
     copy = out / "loadtest.db"
@@ -319,12 +319,12 @@ def local(args) -> bool:
     its server.log is worth reading)."""
     import httpx
 
-    out = Path(tempfile.mkdtemp(prefix="racemgr-loadtest-"))
+    out = Path(tempfile.mkdtemp(prefix="derbytime-loadtest-"))
     plan = prepare(Path(args.db), out, args.port)
     url = f"http://127.0.0.1:{args.port}"
     with open(out / "server.log", "w", encoding="utf-8") as log:
         server = subprocess.Popen(
-            [sys.executable, "-m", "racemgr", "--config", str(out / "config.toml"), "serve",
+            [sys.executable, "-m", "derbytime", "--config", str(out / "config.toml"), "serve",
              "--host", "127.0.0.1", "--port", str(args.port), "--log-level", "warning"],
             stdout=log, stderr=subprocess.STDOUT,
         )

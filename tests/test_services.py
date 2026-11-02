@@ -4,13 +4,13 @@ from collections import Counter
 import pytest
 from sqlmodel import Session, select
 
-from racemgr.bus import EventBus
-from racemgr.models import AuditLog, Entry, Event, EventType, Group, Heat, HeatLane, HeatStatus, Racer, Round, RoundKind, Track
-from racemgr.seed import seed_demo
-from racemgr.services import Actor, ServiceError, views
-from racemgr.services.race import RaceService
-from racemgr.services.roster import import_csv
-from racemgr.services.schedule import (
+from derbytime.bus import EventBus
+from derbytime.models import AuditLog, Entry, Event, EventType, Group, Heat, HeatLane, HeatStatus, Racer, Round, RoundKind, Track
+from derbytime.seed import seed_demo
+from derbytime.services import Actor, ServiceError, views
+from derbytime.services.race import RaceService
+from derbytime.services.roster import import_csv
+from derbytime.services.schedule import (
     add_pass,
     clear_schedule,
     create_final,
@@ -23,7 +23,7 @@ from racemgr.services.schedule import (
     remove_pass,
     set_race_order,
 )
-from racemgr.services.setup import add_track, create_event
+from derbytime.services.setup import add_track, create_event
 
 ACTOR = Actor(None, "test")
 
@@ -478,7 +478,7 @@ def test_standings_final_and_runoff(settings, engine, demo):
 def test_projected_finish_uses_estimate_then_measured_pace(session, demo):
     from datetime import timedelta
 
-    from racemgr.models import utcnow
+    from derbytime.models import utcnow
 
     derby, _ = demo
     track = tracks_of(session, derby)[0]

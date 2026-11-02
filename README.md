@@ -52,10 +52,10 @@ The roles, and the page each one keeps open:
 **Before the day**
 1. Install and start the server (see [Quick start](#quick-start-laptop)), and open the one-time admin link on the race director's laptop.
 2. Create the event (derby or regatta), set its tracks and lane counts, and import the roster. Check the preview, then apply it.
-3. Practice with the simulator timer or `racemgr seed-demo`, and run the [load test](#load-testing) on a copy of the database if anything has changed.
+3. Practice with the simulator timer or `derbytime seed-demo`, and run the [load test](#load-testing) on a copy of the database if anything has changed.
 
 **Setting up at the venue**
-1. Put the laptop on the event Wi-Fi (not a guest or "client isolation" network; a phone hotspot or travel router works) and start `racemgr serve --host 0.0.0.0`. Allow it through the firewall.
+1. Put the laptop on the event Wi-Fi (not a guest or "client isolation" network; a phone hotspot or travel router works) and start `derbytime serve --host 0.0.0.0`. Allow it through the firewall.
 2. Post the server's address (`http://<laptop-LAN-IP>:8000`, printed when it starts) where families can see it, for example on a sign or the projector, so they can open the home page.
 3. On `/admin/officials`, create a QR code for each official's role. Each person scans theirs once and their phone opens straight to their page.
 
@@ -84,14 +84,14 @@ The step-by-step reference for each screen is in [Running an event](#running-an-
 Requires Python 3.11+.
 
 ```bash
-git clone <this repo> racemgr && cd racemgr
+git clone <this repo> derbytime && cd derbytime
 python -m venv .venv
 # Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
 pip install -e ".[dev]"            # or: pip install git+<repo-url>
-racemgr init-config                # writes ./config.toml (optional; defaults work)
-racemgr init-db
-racemgr seed-demo                  # demo derby + regatta, 2 dens, 20 scouts
-racemgr serve --host 0.0.0.0 --port 8000
+derbytime init-config                # writes ./config.toml (optional; defaults work)
+derbytime init-db
+derbytime seed-demo                  # demo derby + regatta, 2 dens, 20 scouts
+derbytime serve --host 0.0.0.0 --port 8000
 ```
 
 On first start with no admin device, the console prints a **one-time admin link**:
@@ -104,13 +104,13 @@ On first start with no admin device, the console prints a **one-time admin link*
 ========================================================================
 ```
 
-Open it, tap **Join on this device**, and that browser becomes the admin. If you get locked out, run `racemgr admin-url` to print a fresh link (it works while the server is running).
+Open it, tap **Join on this device**, and that browser becomes the admin. If you get locked out, run `derbytime admin-url` to print a fresh link (it works while the server is running).
 
 ### Reaching it from phones
 
 Phones on the same Wi-Fi use `http://<laptop-LAN-IP>:8000`. The app guesses the LAN IP for QR codes. If it guesses wrong (VPNs, multiple adapters), set `public_base_url` in `config.toml`.
 
-- **Windows:** allow Python through Windows Defender Firewall on *Private* networks when prompted, or run `netsh advfirewall firewall add rule name="racemgr" dir=in action=allow protocol=TCP localport=8000`.
+- **Windows:** allow Python through Windows Defender Firewall on *Private* networks when prompted, or run `netsh advfirewall firewall add rule name="derbytime" dir=in action=allow protocol=TCP localport=8000`.
 - **macOS:** accept the "allow incoming connections" prompt.
 - Guest or "client isolation" Wi-Fi networks block phone-to-laptop traffic. Use a normal network or a phone hotspot.
 
@@ -121,14 +121,12 @@ The package is pure Python and runs on Windows, macOS and Linux (including the P
 ```bash
 pip wheel --no-deps -w dist .                 # on a dev machine: dist/derbytime-<version>-py3-none-any.whl
 pip install derbytime-<version>-py3-none-any.whl   # on the server, inside a venv
-racemgr --version
+derbytime --version
 ```
 
-The distribution is called `derbytime`; the command and the Python module are still `racemgr`.
+`python -m derbytime ...` works anywhere `derbytime ...` does, which helps when the venv's script folder isn't on `PATH`.
 
-`python -m racemgr ...` works anywhere `racemgr ...` does, which helps when the venv's script folder isn't on `PATH`.
-
-Where the data lives: `--config PATH`, else `$RACEMGR_CONFIG`, else `./config.toml`. `db_path` and `data_dir` (photos, backups, serial logs) are relative to that config file, or to the current directory when there is none. For an installed server, keep a config file in a dedicated folder and point `--config` at it, so the database doesn't land wherever the command happened to start.
+Where the data lives: `--config PATH`, else `$DERBYTIME_CONFIG`, else `./config.toml`. `db_path` and `data_dir` (photos, backups, serial logs) are relative to that config file, or to the current directory when there is none. For an installed server, keep a config file in a dedicated folder and point `--config` at it, so the database doesn't land wherever the command happened to start.
 
 ### Optional HTTPS with mkcert (for Wake Lock etc.)
 
@@ -138,7 +136,7 @@ Everything works over plain HTTP. A few browser features need a *secure context*
 # install mkcert: https://github.com/FiloSottile/mkcert  (winget install FiloSottile.mkcert / brew install mkcert)
 mkcert -install
 mkcert 192.168.1.140 localhost 127.0.0.1      # use your LAN IP
-racemgr serve --ssl-certfile 192.168.1.140+2.pem --ssl-keyfile 192.168.1.140+2-key.pem
+derbytime serve --ssl-certfile 192.168.1.140+2.pem --ssl-keyfile 192.168.1.140+2-key.pem
 ```
 
 Each phone must trust mkcert's root CA. Run `mkcert -CAROOT` to find `rootCA.pem`, send it to the phone, and install it:
@@ -153,14 +151,14 @@ Tested target: Raspberry Pi 4/5 with Raspberry Pi OS (Bookworm, 64-bit), which s
 
 ```bash
 sudo apt update && sudo apt install -y python3-venv git
-git clone <this repo> ~/racemgr && cd ~/racemgr
+git clone <this repo> ~/derbytime && cd ~/derbytime
 python3 -m venv .venv && . .venv/bin/activate
 pip install -e .
-racemgr init-config && racemgr init-db
+derbytime init-config && derbytime init-db
 sudo usermod -aG dialout $USER     # access to USB serial timers (log out/in after)
 ```
 
-Run it as a service, saved as `/etc/systemd/system/racemgr.service`:
+Run it as a service, saved as `/etc/systemd/system/derbytime.service`:
 
 ```ini
 [Unit]
@@ -169,8 +167,8 @@ After=network-online.target
 
 [Service]
 User=pi
-WorkingDirectory=/home/pi/racemgr
-ExecStart=/home/pi/racemgr/.venv/bin/racemgr serve --host 0.0.0.0 --port 8000
+WorkingDirectory=/home/pi/derbytime
+ExecStart=/home/pi/derbytime/.venv/bin/derbytime serve --host 0.0.0.0 --port 8000
 Restart=on-failure
 
 [Install]
@@ -178,8 +176,8 @@ WantedBy=multi-user.target
 ```
 
 ```bash
-sudo systemctl daemon-reload && sudo systemctl enable --now racemgr
-journalctl -u racemgr -f          # shows the one-time admin link on first run
+sudo systemctl daemon-reload && sudo systemctl enable --now derbytime
+journalctl -u derbytime -f          # shows the one-time admin link on first run
 ```
 
 Set USB timer ports per track on the admin event page, for example `/dev/ttyUSB0`. For stable names, use `/dev/serial/by-id/...`. The Pi's offline **Wi-Fi access point** setup (hostapd/dnsmasq or NetworkManager hotspot, plus a captive DNS name) is a later phase. Until then, run the Pi on a normal Wi-Fi network or a travel router.
@@ -188,7 +186,7 @@ All assets are local (htmx is vendored in `static/vendor`), so nothing needs the
 
 ## Configuration
 
-`config.toml` (see [config.example.toml](src/racemgr/config.example.toml) for every key) holds:
+`config.toml` (see [config.example.toml](src/derbytime/config.example.toml) for every key) holds:
 
 | Section | What |
 | --- | --- |
@@ -199,7 +197,7 @@ All assets are local (htmx is vendored in `static/vendor`), so nothing needs the
 
 Events, tracks, rosters and schedules live in the database and are edited from `/admin`. Per-track overrides (lane count, timing source, serial port, outlier limits) are saved on the track itself.
 
-Lookup order for the config file: `--config PATH`, then `$RACEMGR_CONFIG`, then `./config.toml`, then built-in defaults.
+Lookup order for the config file: `--config PATH`, then `$DERBYTIME_CONFIG`, then `./config.toml`, then built-in defaults. `$RACEMGR_CONFIG` (the variable's name before the rename) still works. The default database file is still `racemgr.db`, so an existing install keeps its data.
 
 ## Running an event
 
@@ -269,7 +267,7 @@ Every change is in the audit log.
 
 ### Backup and export
 
-- **Full backup:** *Download backup* on `/admin`, or `racemgr backup [PATH]` from the command line. Both make a consistent copy of the whole SQLite database (every event, scout, result, official and the audit log), and both are safe while the server is running. Copies are also kept in `<data_dir>/backups/`. To restore: stop the server, delete `racemgr.db-wal` and `racemgr.db-shm`, and copy the backup over `racemgr.db`.
+- **Full backup:** *Download backup* on `/admin`, or `derbytime backup [PATH]` from the command line. Both make a consistent copy of the whole SQLite database (every event, scout, result, official and the audit log), and both are safe while the server is running. Copies are also kept in `<data_dir>/backups/`. To restore: stop the server, delete `racemgr.db-wal` and `racemgr.db-shm`, and copy the backup over `racemgr.db`.
 - **CSV exports** for spreadsheets, linked at the top of each event's admin page:
   - *entries*: the roster plus car number and name, check-in, weight, inspection, and race status. It uses the importer's column names, so it imports back cleanly.
   - *standings*: every den, the final and the pack overall, with disqualified scouts listed as `DQ`.
@@ -291,7 +289,7 @@ Ties are scores equal to the thousandth. They share a rank until a runoff separa
 ## Architecture
 
 ```
-src/racemgr/
+src/derbytime/
   core/            pure Python: lane rotation, multi-track planner, placing/standings/ties  (no web/DB imports, enforced by a test)
   models.py        SQLModel tables
   services/        heat lifecycle (race.py), schedule & standings, alerts, roster, audit
@@ -327,7 +325,7 @@ python tools/loadtest.py local --db racemgr.db
 
 # another machine as the server
 python tools/loadtest.py prepare --db racemgr.db --out lt          # on the server
-racemgr --config lt/config.toml serve --port 8765                  # on the server
+derbytime --config lt/config.toml serve --port 8765                  # on the server
 python tools/loadtest.py run --url http://SERVER-IP:8765 --plan lt/plan.json   # from a laptop
 ```
 

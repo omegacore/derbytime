@@ -1,4 +1,4 @@
-"""`racemgr` command line."""
+"""`derbytime` command line."""
 from __future__ import annotations
 
 import argparse
@@ -80,7 +80,7 @@ def cmd_backup(args, settings) -> int:
     from .services.export import backup_db
 
     engine = make_engine(settings.db_path)
-    dest = Path(args.path) if args.path else Path(settings.data_dir) / "backups" / f"racemgr-{datetime.now():%Y%m%d-%H%M%S}.db"
+    dest = Path(args.path) if args.path else Path(settings.data_dir) / "backups" / f"derbytime-{datetime.now():%Y%m%d-%H%M%S}.db"
     if dest.exists() and not args.force:
         print(f"{dest} already exists (use --force to overwrite).")
         return 1
@@ -101,9 +101,9 @@ def cmd_init_config(args, settings) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="racemgr", description="Derby Time")
+    p = argparse.ArgumentParser(prog="derbytime", description="Derby Time")
     p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
-    p.add_argument("--config", help="path to config.toml (default: $RACEMGR_CONFIG, else ./config.toml)")
+    p.add_argument("--config", help="path to config.toml (default: $DERBYTIME_CONFIG, else ./config.toml)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     s = sub.add_parser("serve", help="run the web server")
@@ -127,7 +127,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(fn=cmd_admin_url)
 
     s = sub.add_parser("backup", help="copy the database (safe while the server runs)")
-    s.add_argument("path", nargs="?", help="destination file (default: <data_dir>/backups/racemgr-<time>.db)")
+    s.add_argument("path", nargs="?", help="destination file (default: <data_dir>/backups/derbytime-<time>.db)")
     s.add_argument("--force", action="store_true")
     s.set_defaults(fn=cmd_backup)
 

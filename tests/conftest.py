@@ -1,8 +1,8 @@
 import pytest
 from sqlmodel import Session
 
-from racemgr.config import load_settings
-from racemgr.db import init_db, make_engine
+from derbytime.config import load_settings
+from derbytime.db import init_db, make_engine
 
 
 @pytest.fixture

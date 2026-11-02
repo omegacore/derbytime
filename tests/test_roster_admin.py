@@ -6,9 +6,9 @@ import sqlite3
 import pytest
 from sqlmodel import Session, select
 
-from racemgr.models import Entry, EntryStatus, Event, EventType, Group, Heat, HeatLane, HeatStatus, Racer, Role
-from racemgr.services import ServiceError, export
-from racemgr.services.roster import (
+from derbytime.models import Entry, EntryStatus, Event, EventType, Group, Heat, HeatLane, HeatStatus, Racer, Role
+from derbytime.services import ServiceError, export
+from derbytime.services.roster import (
     apply_import,
     import_csv,
     merge_racers,
@@ -17,8 +17,8 @@ from racemgr.services.roster import (
     set_entry_status,
     update_racer,
 )
-from racemgr.services.schedule import create_final, eligible_entries, event_standings, pack_standings, regenerate
-from racemgr.services.setup import create_event
+from derbytime.services.schedule import create_final, eligible_entries, event_standings, pack_standings, regenerate
+from derbytime.services.setup import create_event
 
 from test_services import ACTOR, demo, make_service, race_all, run, tracks_of  # noqa: F401
 from test_web import admin, app, client, join  # noqa: F401

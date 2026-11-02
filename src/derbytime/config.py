@@ -68,7 +68,7 @@ def _merge(base: dict, override: dict) -> dict:
 def find_config_path(explicit: str | os.PathLike | None = None) -> Path | None:
     if explicit:
         return Path(explicit)
-    env = os.environ.get("RACEMGR_CONFIG")
+    env = os.environ.get("DERBYTIME_CONFIG") or os.environ.get("RACEMGR_CONFIG")  # pre-rename name
     if env:
         return Path(env)
     local = Path.cwd() / "config.toml"

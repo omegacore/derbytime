@@ -3,11 +3,11 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
-from racemgr import auth
-from racemgr.app import create_app
-from racemgr.models import AuditLog, Heat, HeatLane, HeatStatus, Role
-from racemgr.services import ServiceError, views
-from racemgr.services.schedule import generate_group_rounds, group_rounds, heat_editor, race_order, save_heat_lineups, solo_heats
+from derbytime import auth
+from derbytime.app import create_app
+from derbytime.models import AuditLog, Heat, HeatLane, HeatStatus, Role
+from derbytime.services import ServiceError, views
+from derbytime.services.schedule import generate_group_rounds, group_rounds, heat_editor, race_order, save_heat_lineups, solo_heats
 
 from test_regenerate import race
 from test_services import ACTOR, make_event_with_dens, tracks_of

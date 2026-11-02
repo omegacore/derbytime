@@ -5,10 +5,10 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
-from racemgr import auth
-from racemgr.app import create_app
-from racemgr.models import Entry, Event, Heat, HeatLane, HeatStatus, JoinToken, Official, Role, Track, utcnow
-from racemgr.seed import seed_demo
+from derbytime import auth
+from derbytime.app import create_app
+from derbytime.models import Entry, Event, Heat, HeatLane, HeatStatus, JoinToken, Official, Role, Track, utcnow
+from derbytime.seed import seed_demo
 
 
 @pytest.fixture
@@ -67,7 +67,7 @@ def test_public_pages_render(client, app):
 
 
 def test_rank_theme_matches_den_name():
-    from racemgr.routes.pages import rank_theme
+    from derbytime.routes.pages import rank_theme
 
     assert rank_theme("Wolf Den 3") == "wolf"
     assert rank_theme("0 - LION") == "lion"
@@ -88,7 +88,7 @@ def test_standings_board_slides(client):
 
 
 def test_standings_board_uses_official_icons(client, tmp_path, monkeypatch):
-    from racemgr.routes import pages
+    from derbytime.routes import pages
 
     monkeypatch.setattr(pages, "RANK_ICON_DIR", tmp_path)
     (tmp_path / "Wolf.png").write_bytes(b"")
@@ -99,8 +99,8 @@ def test_standings_board_uses_official_icons(client, tmp_path, monkeypatch):
 
 
 def test_standings_board_shows_vehicles(app, client, monkeypatch):
-    from racemgr.core.scoring import Standing
-    from racemgr.routes import pages
+    from derbytime.core.scoring import Standing
+    from derbytime.routes import pages
 
     def row(entry_id, rank, score, photo):
         return {"s": Standing(entry_id, rank, score, 1, score, score, 0), "entry_id": entry_id, "number": 100 + entry_id,
@@ -122,8 +122,8 @@ def test_standings_board_shows_vehicles(app, client, monkeypatch):
 
 
 def test_board_vehicle_matches_event_name():
-    from racemgr.models import EventType
-    from racemgr.routes.pages import board_vehicle
+    from derbytime.models import EventType
+    from derbytime.routes.pages import board_vehicle
 
     assert board_vehicle(Event(name="321 Regatta 2026!", type=EventType.regatta)) == "boat"
     assert board_vehicle(Event(name="Pack 9 Pinewood DERBY", type=EventType.regatta)) == "car"  # name wins
@@ -443,7 +443,7 @@ def test_admin_event_setup_end_to_end(app, admin):
 
 
 def race_order_ids(app, event_type):
-    from racemgr.services.schedule import group_rounds
+    from derbytime.services.schedule import group_rounds
 
     with Session(app.state.engine) as s:
         ev = s.exec(select(Event).where(Event.type == event_type)).first()
@@ -472,7 +472,7 @@ def test_admin_race_order_controls(app, admin):
     assert [i for i, _ in race_order_ids(app, "derby")[1]] == [i for i, _ in order]
 
     with Session(app.state.engine) as s:
-        from racemgr.models import Group
+        from derbytime.models import Group
         wolf = s.exec(select(Group).where(Group.name == "Wolf Den 3")).one()
     r = admin.post(f"/admin/event/{ev_id}/passes", data={"group_id": wolf.id}, follow_redirects=False)
     assert "Run%20added" in r.headers["location"]
@@ -671,7 +671,7 @@ def test_event_bound_officials_only_see_their_event(app):
 
 def test_page_cache_renders_once_for_concurrent_viewers():
     import threading
-    from racemgr.cache import PageCache
+    from derbytime.cache import PageCache
 
     cache, calls = PageCache(), []
 

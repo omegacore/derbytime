@@ -2,10 +2,10 @@
 track is free races the next heat, so a slow track never holds the others up."""
 from sqlmodel import select
 
-from racemgr.models import AuditLog, Heat, HeatLane, HeatStatus, RoundKind
-from racemgr.services import views
-from racemgr.services.schedule import create_final, generate_group_rounds
-from racemgr.services.setup import add_track
+from derbytime.models import AuditLog, Heat, HeatLane, HeatStatus, RoundKind
+from derbytime.services import views
+from derbytime.services.schedule import create_final, generate_group_rounds
+from derbytime.services.setup import add_track
 
 from test_regenerate import race_heats
 from test_services import ACTOR, make_event_with_dens, make_service, run, tracks_of
@@ -162,8 +162,8 @@ def test_queued_den_heats_show_next_free_track(settings, session):
 def test_projected_finish_shares_queue_by_pace(settings, session):
     from datetime import timedelta
 
-    from racemgr.models import utcnow
-    from racemgr.services.schedule import projected_finish
+    from derbytime.models import utcnow
+    from derbytime.services.schedule import projected_finish
 
     ev, (a, b) = two_track_event(session, settings)
     total = len(views.scheduled_heats(session, [a, b]))
@@ -199,7 +199,7 @@ def test_every_track_lists_the_same_queue(settings, session):
 
 
 def test_follow_alerts_use_the_shared_queue(settings, session):
-    from racemgr.services.alerts import AlertService
+    from derbytime.services.alerts import AlertService
 
     ev, (a, b) = two_track_event(session, settings)
     queue = [h.id for h, _ in views.scheduled_heats(session, [a, b])]

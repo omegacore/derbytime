@@ -29,7 +29,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 $py = Join-Path $root '.venv/Scripts/python.exe'
-$exe = Join-Path $root '.venv/Scripts/racemgr.exe'
+$exe = Join-Path $root '.venv/Scripts/derbytime.exe'
 
 function Step($msg) { Write-Host "==> $msg" -ForegroundColor Cyan }
 function Fail($msg) { Write-Host "deploy: $msg" -ForegroundColor Red; exit 1 }
@@ -39,7 +39,7 @@ function Get-ActiveHeats {
     # Read-only open, so this is safe while the server has the DB.
     $code = @'
 import sqlite3, sys
-from racemgr.config import load_settings
+from derbytime.config import load_settings
 db = load_settings().db_path
 con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
 rows = con.execute("select status, count(*) from heat where status in ('staged','armed','pending') group by status").fetchall()
@@ -51,14 +51,14 @@ print(", ".join(f"{n} {s}" for s, n in rows))
 }
 
 function Get-ServerRoot([int]$port) {
-    # racemgr.exe is a launcher with python children; kill from the top so
-    # nothing is left holding the port.
+    # derbytime.exe is a launcher with python children; kill from the top so
+    # nothing is left holding the port. 'racemgr' is the server's pre-rename name.
     $conn = Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue | Select-Object -First 1
     if (-not $conn) { return $null }
     $proc = Get-CimInstance Win32_Process -Filter "ProcessId=$($conn.OwningProcess)"
     while ($proc) {
         $parent = Get-CimInstance Win32_Process -Filter "ProcessId=$($proc.ParentProcessId)"
-        if (-not $parent -or $parent.CommandLine -notmatch 'racemgr') { break }
+        if (-not $parent -or $parent.CommandLine -notmatch 'derbytime|racemgr') { break }
         $proc = $parent
     }
     return $proc
@@ -93,6 +93,14 @@ if (-not $RestartOnly) {
         Step "merging $Branch (staged, not committed)"
         & git merge --no-ff --no-commit "refs/heads/$Branch"
         if ($LASTEXITCODE) { & git merge --abort; Fail "merge of $Branch conflicts; rebase it on main in its worktree first" }
+
+        if (-not (Test-Path $exe)) {
+            # First deploy after a package rename: the editable install still
+            # points at the old module, so tests and the restart need a reinstall.
+            Step 'reinstalling the package (editable)'
+            & $py -m pip install -q --no-deps -e .
+            if ($LASTEXITCODE) { & git merge --abort; Fail 'pip install -e . failed; merge aborted' }
+        }
 
         Step 'running test suite'
         & $py -m pytest -q

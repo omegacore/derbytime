@@ -1,4 +1,4 @@
-"""`python -m racemgr`: the same CLI as the `racemgr` script, for machines
+"""`python -m derbytime`: the same CLI as the `derbytime` script, for machines
 where the venv's script directory isn't on PATH."""
 import sys
 

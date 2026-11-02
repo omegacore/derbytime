@@ -17,7 +17,7 @@ SRC = {
     "aol": "Arrow of Light-insignia-CSBC.jpg",
 }
 MASTERS = ROOT / "assets" / "rank-emblems"
-WEB = ROOT / "src" / "racemgr" / "static" / "ranks"
+WEB = ROOT / "src" / "derbytime" / "static" / "ranks"
 SENTINEL = (1, 254, 3)
 OUT = 512
 

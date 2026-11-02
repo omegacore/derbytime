@@ -1,4 +1,4 @@
-"""`racemgr seed-demo`: a demo derby and regatta for two dens of ten scouts."""
+"""`derbytime seed-demo`: a demo derby and regatta for two dens of ten scouts."""
 from __future__ import annotations
 
 from sqlmodel import Session
