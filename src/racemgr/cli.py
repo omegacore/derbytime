@@ -9,7 +9,7 @@ from pathlib import Path
 
 from sqlmodel import Session, select
 
-from . import auth
+from . import __version__, auth
 from .config import EXAMPLE_PATH, load_settings
 from .db import init_db, make_engine
 
@@ -27,7 +27,7 @@ def cmd_serve(args, settings) -> int:
     settings.use_https = bool(args.ssl_certfile)
     app = create_app(settings)
     scheme = "https" if settings.use_https else "http"
-    print(f"Scout Race Manager on {scheme}://{auth.lan_ip()}:{settings.port}  (db: {settings.db_path})", flush=True)
+    print(f"Scout Race Manager {__version__} on {scheme}://{auth.lan_ip()}:{settings.port}  (db: {settings.db_path})", flush=True)
     uvicorn.run(
         app,
         host=settings.host,
@@ -102,7 +102,8 @@ def cmd_init_config(args, settings) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="racemgr", description="Scout Race Manager")
-    p.add_argument("--config", help="path to config.toml (default: ./config.toml or $RACEMGR_CONFIG)")
+    p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    p.add_argument("--config", help="path to config.toml (default: $RACEMGR_CONFIG, else ./config.toml)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     s = sub.add_parser("serve", help="run the web server")

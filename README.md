@@ -45,6 +45,20 @@ Phones on the same Wi-Fi use `http://<laptop-LAN-IP>:8000`. The app guesses the 
 - **macOS:** accept the "allow incoming connections" prompt.
 - Guest or "client isolation" Wi-Fi networks block phone-to-laptop traffic. Use a normal network or a phone hotspot.
 
+## Installing from a wheel
+
+The package is pure Python and runs on Windows, macOS and Linux (including the Pi). Templates, static files and the default config ship inside the wheel, so a server machine needs no checkout:
+
+```bash
+pip wheel --no-deps -w dist .                 # on a dev machine: dist/racemgr-<version>-py3-none-any.whl
+pip install racemgr-<version>-py3-none-any.whl   # on the server, inside a venv
+racemgr --version
+```
+
+`python -m racemgr ...` works anywhere `racemgr ...` does, which helps when the venv's script folder isn't on `PATH`.
+
+Where the data lives: `--config PATH`, else `$RACEMGR_CONFIG`, else `./config.toml`. `db_path` and `data_dir` (photos, backups, serial logs) are relative to that config file, or to the current directory when there is none. For an installed server, keep a config file in a dedicated folder and point `--config` at it, so the database doesn't land wherever the command happened to start.
+
 ### Optional HTTPS with mkcert (for Wake Lock etc.)
 
 Everything works over plain HTTP. A few browser features need a *secure context*, though: screen **Wake Lock** on the stopwatch page, and later service workers and Web Push. To enable them on the LAN:

@@ -1,4 +1,5 @@
 import ast
+import os
 from pathlib import Path
 
 from sqlmodel import Session, func, select
@@ -61,3 +62,33 @@ def test_config_overrides(tmp_path):
     assert s.db_path == tmp_path / "x" / "race.db"
     assert s.type_defaults("derby").lane_count == 6
     assert s.type_defaults("derby").timing_source == "simulator"  # untouched default
+
+
+def test_python_dash_m_and_version():
+    import subprocess
+    import sys
+
+    src = str(Path(racemgr.core.__file__).parents[2])
+    env = {**os.environ, "PYTHONPATH": src + os.pathsep + os.environ.get("PYTHONPATH", "")}
+    out = subprocess.run([sys.executable, "-m", "racemgr", "--version"], capture_output=True, text=True, env=env, timeout=60)
+    assert out.returncode == 0, out.stderr
+    assert out.stdout.startswith("racemgr ")
+
+
+def test_package_data_covers_every_non_python_file():
+    """A data file outside the package-data globs works from a checkout but is
+    missing from the wheel, so a pip-installed server would 404 or crash."""
+    import tomllib
+
+    root = Path(racemgr.core.__file__).parents[3]
+    pyproject = root / "pyproject.toml"
+    if not pyproject.exists():  # installed from a wheel: nothing to check
+        return
+    globs = tomllib.loads(pyproject.read_text(encoding="utf-8"))["tool"]["setuptools"]["package-data"]["racemgr"]
+    prefixes = {g.split("**")[0] for g in globs}
+    pkg = root / "src" / "racemgr"
+    for path in pkg.rglob("*"):
+        if path.is_dir() or path.suffix in (".py", ".pyc") or "__pycache__" in path.parts:
+            continue
+        rel = path.relative_to(pkg).as_posix()
+        assert any(rel == p or (p.endswith("/") and rel.startswith(p)) for p in prefixes), f"{rel} is not in package-data"

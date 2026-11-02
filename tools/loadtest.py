@@ -83,7 +83,7 @@ def prepare(db: Path, out: Path, port: int) -> Path:
         s.commit()
     plan["racers"] = sorted(set(plan["racers"]))
     path = out / "plan.json"
-    path.write_text(json.dumps(plan, indent=1))
+    path.write_text(json.dumps(plan, indent=1), encoding="utf-8")
     print(f"Prepared {copy} ({len(plan['tracks'])} tracks, {len(plan['racers'])} racers, {len(plan['tokens'])} officials)")
     return path
 
@@ -309,7 +309,7 @@ class LoadTest:
 
 
 def run(url: str, plan_path: Path, args) -> bool:
-    lt = LoadTest(url, json.loads(plan_path.read_text()), args.viewers, args.heats, args.gap)
+    lt = LoadTest(url, json.loads(plan_path.read_text(encoding="utf-8")), args.viewers, args.heats, args.gap)
     asyncio.run(lt.main())
     return lt.report(args.max_official_p95, args.max_viewer_p95)
 
@@ -322,9 +322,9 @@ def local(args) -> bool:
     out = Path(tempfile.mkdtemp(prefix="racemgr-loadtest-"))
     plan = prepare(Path(args.db), out, args.port)
     url = f"http://127.0.0.1:{args.port}"
-    with open(out / "server.log", "w") as log:
+    with open(out / "server.log", "w", encoding="utf-8") as log:
         server = subprocess.Popen(
-            [sys.executable, "-m", "racemgr.cli", "--config", str(out / "config.toml"), "serve",
+            [sys.executable, "-m", "racemgr", "--config", str(out / "config.toml"), "serve",
              "--host", "127.0.0.1", "--port", str(args.port), "--log-level", "warning"],
             stdout=log, stderr=subprocess.STDOUT,
         )
@@ -342,7 +342,7 @@ def local(args) -> bool:
         finally:
             server.terminate()
             server.wait(10)
-    crashes = (out / "server.log").read_text(errors="replace").count("Exception in ASGI application")
+    crashes = (out / "server.log").read_text(encoding="utf-8", errors="replace").count("Exception in ASGI application")
     if crashes:
         print(f"  - server logged {crashes} unhandled exceptions; see {out / 'server.log'}")
     if ok and not crashes:
