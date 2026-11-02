@@ -62,7 +62,7 @@ def create_app(settings: Settings, engine: Engine | None = None, print_admin_lin
         await race.stop()
         await bus.close()
 
-    app = FastAPI(title="Scout Race Manager", lifespan=lifespan, docs_url=None, redoc_url=None)
+    app = FastAPI(title="Derby Time", lifespan=lifespan, docs_url=None, redoc_url=None)
     app.state.settings = settings
     app.state.engine = engine
     app.state.bus = bus

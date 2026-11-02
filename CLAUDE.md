@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Scout Race Manager (`racemgr`): a self-hosted FastAPI + HTMX app for Pinewood Derby / Rain Gutter Regatta races. One laptop runs the server; officials' and families' phones on the same Wi-Fi are the clients. README.md covers setup, the event workflow and architecture; this file covers what to keep in mind while changing code.
+Derby Time (package `derbytime`, Python module and command `racemgr`): a self-hosted FastAPI + HTMX app for Pinewood Derby / Rain Gutter Regatta races. One laptop runs the server; officials' and families' phones on the same Wi-Fi are the clients. README.md covers setup, the event workflow and architecture; this file covers what to keep in mind while changing code.
 
 ## Commands
 

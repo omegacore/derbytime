@@ -27,7 +27,7 @@ def cmd_serve(args, settings) -> int:
     settings.use_https = bool(args.ssl_certfile)
     app = create_app(settings)
     scheme = "https" if settings.use_https else "http"
-    print(f"Scout Race Manager {__version__} on {scheme}://{auth.lan_ip()}:{settings.port}  (db: {settings.db_path})", flush=True)
+    print(f"Derby Time {__version__} on {scheme}://{auth.lan_ip()}:{settings.port}  (db: {settings.db_path})", flush=True)
     uvicorn.run(
         app,
         host=settings.host,
@@ -101,7 +101,7 @@ def cmd_init_config(args, settings) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="racemgr", description="Scout Race Manager")
+    p = argparse.ArgumentParser(prog="racemgr", description="Derby Time")
     p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     p.add_argument("--config", help="path to config.toml (default: $RACEMGR_CONFIG, else ./config.toml)")
     sub = p.add_subparsers(dest="cmd", required=True)

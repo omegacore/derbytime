@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1f5fbf">
-<title>{% block title %}Race Manager{% endblock %}</title>
+<title>{% block title %}Derby Time{% endblock %}</title>
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/vendor/htmx.min.js"></script>
 <script src="/static/live.js"></script>
@@ -14,7 +14,7 @@
 <body class="{% if kiosk %}kiosk{% endif %} {% block body_class %}{% endblock %}">
 <header class="top{% if me %} role-{{ me.role.value }}{% endif %}">
   <div class="bar">
-    <a class="brand" href="/">🏁 Race Manager</a>
+    <a class="brand" href="/">🏁 Derby Time</a>
     <nav>
       {% for n in nav %}<a href="{{ n.href }}"{% if n.current %} aria-current="page"{% endif %}{% if me and loop.first %} class="mine"{% endif %}>{{ n.label }}</a>{% endfor %}
     </nav>

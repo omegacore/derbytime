@@ -3,9 +3,9 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "racemgr"
+name = "derbytime"
 version = "0.1.0"
-description = "Self-hosted race manager for Cub Scout Pinewood Derby and Rain Gutter Regatta events"
+description = "Derby Time: self-hosted race management for Cub Scout Pinewood Derby and Rain Gutter Regatta events"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
