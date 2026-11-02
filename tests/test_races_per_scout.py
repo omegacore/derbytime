@@ -7,12 +7,12 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import select
 
-from racemgr.app import create_app
-from racemgr.models import EventType, Heat, HeatLane, HeatStatus, Role
-from racemgr.services import ServiceError
-from racemgr.services.roster import import_csv
-from racemgr.services.schedule import add_pass, generate_group_rounds, group_rounds, regenerate
-from racemgr.services.setup import add_track, create_event
+from derbytime.app import create_app
+from derbytime.models import EventType, Heat, HeatLane, HeatStatus, Role
+from derbytime.services import ServiceError
+from derbytime.services.roster import import_csv
+from derbytime.services.schedule import add_pass, generate_group_rounds, group_rounds, regenerate
+from derbytime.services.setup import add_track, create_event
 
 from test_regenerate import check_in_new_scout, runs_per_entry
 from test_shared_start import join_as

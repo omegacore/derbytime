@@ -1,13 +1,13 @@
 # CLAUDE.md
 
-Scout Race Manager (`racemgr`): a self-hosted FastAPI + HTMX app for Pinewood Derby / Rain Gutter Regatta races. One laptop runs the server; officials' and families' phones on the same Wi-Fi are the clients. README.md covers setup, the event workflow and architecture; this file covers what to keep in mind while changing code.
+Derby Time (`derbytime`): a self-hosted FastAPI + HTMX app for Pinewood Derby / Rain Gutter Regatta races. One laptop runs the server; officials' and families' phones on the same Wi-Fi are the clients. README.md covers setup, the event workflow and architecture; this file covers what to keep in mind while changing code.
 
 ## Commands
 
 ```bash
 .venv/Scripts/python -m pytest -q                         # full suite (~30 s); keep it green
 .venv/Scripts/python tools/loadtest.py local --db racemgr.db   # race-day load test on a copy of the DB
-.venv/Scripts/racemgr.exe serve                            # dev server (also .claude/launch.json "racemgr")
+.venv/Scripts/derbytime.exe serve                            # dev server (also .claude/launch.json "derbytime")
 ```
 
 Windows machine: use `.venv/Scripts/...`. Node is not installed, so check JS changes in the browser pane.
@@ -47,7 +47,7 @@ Several sessions work at once, each in its own worktree under `.claude/worktrees
 - **Need the user?** Set `Status: blocked: <why>`.
 - **Never** commit to `main` or edit files in the main checkout. The server runs from there, and static files reach phones on the next reload, mid-race. Don't set `merged` or remove your worktree; the orchestrator does both.
 - **Testing in a worktree:** the venv's editable install points at the main checkout's `src`, so a plain `pytest` tests `main`, not your branch. From the worktree root: `PYTHONPATH="$PWD/src" ../../../.venv/Scripts/python -m pytest -q` (the load test also needs `PYTHONPATH`).
-- **Dev servers:** port 8001 or up, on a copy of the DB with your own `config.toml` (`RACEMGR_CONFIG`). Never port 8000 or the real `racemgr.db`.
+- **Dev servers:** port 8001 or up, on a copy of the DB with your own `config.toml` (`DERBYTIME_CONFIG`). Never port 8000 or the real `racemgr.db`.
 - Line endings are LF (`.gitattributes`). If `git diff --stat main` shows whole-file changes, your editor wrote CRLF: run `git add --renormalize .` and commit.
 
 ## Conventions

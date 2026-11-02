@@ -288,7 +288,7 @@ def _slug(name: str) -> str:
 @router.get("/backup")
 def admin_backup(request: Request, s: Session = Depends(get_session), me=Depends(get_official)):
     admin_only(me)
-    name = f"racemgr-{_stamp()}.db"
+    name = f"derbytime-{_stamp()}.db"
     dest = export.backup_db(request.app.state.engine, request.app.state.settings.data_dir / "backups" / name)
     return FileResponse(dest, media_type="application/vnd.sqlite3", filename=name)
 

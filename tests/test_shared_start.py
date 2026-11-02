@@ -6,10 +6,10 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
-from racemgr.app import create_app
-from racemgr.models import Event, Heat, HeatLane, HeatStatus, Role, Track
-from racemgr.seed import seed_demo
-from racemgr.services import Actor, ServiceError
+from derbytime.app import create_app
+from derbytime.models import Event, Heat, HeatLane, HeatStatus, Role, Track
+from derbytime.seed import seed_demo
+from derbytime.services import Actor, ServiceError
 
 from test_services import ACTOR, make_service, run, tracks_of
 
@@ -267,7 +267,7 @@ def test_timekeeper_rerun_when_track_has_moved_on(settings, engine, session):
         new = await svc.rerun(first.id, "Timer didn't record", ACTOR)
         assert status_of(svc, new.id).status == HeatStatus.scheduled  # track busy: front of the queue
         await svc.unstage(t.id, ACTOR)
-        from racemgr.services import views
+        from derbytime.services import views
 
         with svc.session() as s:
             assert views.plan_all(s)[t.id][0].id == new.id
@@ -293,7 +293,7 @@ def web(settings, engine):
 
 
 def join_as(app, role, track_id=None, lane=None):
-    from racemgr import auth
+    from derbytime import auth
 
     c = TestClient(app)
     with Session(app.state.engine) as s:

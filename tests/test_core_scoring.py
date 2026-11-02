@@ -1,6 +1,6 @@
 import pytest
 
-from racemgr.core.scoring import (
+from derbytime.core.scoring import (
     Mode,
     RunResult,
     compute_standings,

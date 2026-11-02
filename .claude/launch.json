@@ -2,15 +2,15 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "racemgr",
-      "runtimeExecutable": ".venv/Scripts/racemgr.exe",
+      "name": "derbytime",
+      "runtimeExecutable": ".venv/Scripts/derbytime.exe",
       "runtimeArgs": ["serve", "--host", "0.0.0.0", "--port", "8000"],
       "port": 8000
     },
     {
-      "name": "racemgr-worktree",
+      "name": "derbytime-worktree",
       "runtimeExecutable": "../../../.venv/Scripts/python.exe",
-      "runtimeArgs": ["-c", "import sys; sys.path.insert(0, 'src'); from racemgr.cli import main; sys.exit(main())", "serve", "--host", "127.0.0.1", "--port", "8001"],
+      "runtimeArgs": ["-c", "import sys; sys.path.insert(0, 'src'); from derbytime.cli import main; sys.exit(main())", "serve", "--host", "127.0.0.1", "--port", "8001"],
       "port": 8001
     }
   ]

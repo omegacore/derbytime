@@ -1,13 +1,25 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "racemgr"
+name = "derbytime"
 version = "0.1.0"
-description = "Self-hosted race manager for Cub Scout Pinewood Derby and Rain Gutter Regatta events"
+description = "Derby Time: self-hosted race management for Cub Scout Pinewood Derby and Rain Gutter Regatta events"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
+keywords = ["pinewood derby", "rain gutter regatta", "cub scouts", "race timing"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: FastAPI",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
 dependencies = [
     "fastapi>=0.110",
     "uvicorn[standard]>=0.29",
@@ -22,13 +34,13 @@ dependencies = [
 dev = ["pytest>=8", "httpx>=0.27"]
 
 [project.scripts]
-racemgr = "racemgr.cli:main"
+derbytime = "derbytime.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-racemgr = ["templates/**/*", "static/**/*", "config.example.toml"]
+derbytime = ["templates/**/*", "static/**/*", "config.example.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

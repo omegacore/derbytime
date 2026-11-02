@@ -7,13 +7,13 @@ from collections import Counter
 import pytest
 from sqlmodel import Session, select
 
-from racemgr.db import init_db, make_engine
-from racemgr.models import AuditLog, Entry, Heat, HeatLane, HeatStatus, Racer, Round, Track
-from racemgr.seed import seed_demo
-from racemgr.services import ServiceError
-from racemgr.services.roster import add_entry, get_or_create_group, import_csv
-from racemgr.services.schedule import generate_group_rounds, group_rounds, regenerate, schedule_problems
-from racemgr.services.setup import add_track
+from derbytime.db import init_db, make_engine
+from derbytime.models import AuditLog, Entry, Heat, HeatLane, HeatStatus, Racer, Round, Track
+from derbytime.seed import seed_demo
+from derbytime.services import ServiceError
+from derbytime.services.roster import add_entry, get_or_create_group, import_csv
+from derbytime.services.schedule import generate_group_rounds, group_rounds, regenerate, schedule_problems
+from derbytime.services.setup import add_track
 
 from test_services import ACTOR, make_event_with_dens, make_service, run, tracks_of
 

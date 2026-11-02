@@ -1,28 +1,97 @@
-# Scout Race Manager
+# Derby Time
 
-Self-hosted race management for Cub Scout **Pinewood Derby** and **Rain Gutter Regatta** events.
-It runs on a laptop now, and later on a Raspberry Pi acting as an offline Wi-Fi access point.
-Phones on the same network are the officials' controllers and the families' live scoreboard.
+Self-hosted race day for Cub Scout **Pinewood Derby** and **Rain Gutter Regatta** events.
+One laptop (or a Raspberry Pi) runs the server. Phones on the same Wi-Fi are the officials' controllers and the families' live scoreboard. Nothing needs the internet.
 
-- Lane-balanced heats (every car/boat runs every lane once), raced by den, plus a final and tie-break runoffs
-- Several tracks at once, fed from one shared queue: whichever track is free races the next heat, so a slow track never holds the others up. The scheduler never puts a scout on two tracks at the same moment (racers are shared across events, so this covers a derby and a regatta running side by side)
-- Timing sources: simulator, phone stopwatches for regatta lane officials, and USB timers (interface only in phase 1)
-- Every result is **pending** until the head timekeeper approves, edits (a reason is required) or calls a re-run. Every change is audit-logged.
-- Officials join by scanning a QR code. Viewers need no login and can follow racers for in-page alerts.
+## Features
+
+**Roster and check-in**
+- Import the pack roster export (CSV, tab-separated, or rows pasted from the spreadsheet). Every import shows a preview before it changes anything, and a later import is a sync: matched by Member ID, nobody deleted, inactive scouts stop being scheduled.
+- Only the columns needed to race are stored. Parent contact details, addresses and the rest of the export are ignored.
+- Check-in desk on a phone: checked in, weight, pass/fail inspection. Car/boat numbers are assigned automatically.
+- Scouts and dens are pack-wide, so a derby and a regatta share one roster.
+
+**Scheduling**
+- Lane-balanced heats: every car or boat runs every lane once per run, raced by den, with a configurable number of runs per den.
+- Several tracks (or gutters) at once, fed from one shared queue. Whichever track is free races the next heat, so a slow track never holds the others up, and no scout is ever on two tracks at the same moment, even across a derby and a regatta running side by side.
+- Change things mid-event: drag the race order, add or remove a run, take a broken lane out of service, add or switch off a track, add a late arrival. Unraced heats are rescheduled; raced results are never touched.
+- Finals (top N per den) and tie-break runoffs, offered automatically when a tie decides a place.
+
+**Timing and results**
+- Timing sources: phone stopwatches for regatta lane officials, a simulator for practice, and USB timers (interface in place; gate parsers are on the roadmap). Manual entry when a timer fails.
+- Regatta shared start: one START press, from the operator or any lane official, starts every lane's clock. The earliest press wins, and a late-arriving earlier press corrects the times automatically. Phones sync to the server clock.
+- Lane submissions are kept on the phone and retried if the Wi-Fi drops, so a slow or flaky network delays results but never changes them.
+- Every result is **pending** until the head timekeeper approves it, edits it (a reason is required) or calls a re-run. Out-of-range times are flagged.
+- Withdraw, disqualify or reinstate a scout with a reason; heats, rankings and finals adjust.
+- Scoring by average time, best time or points.
+
+**Officials and families**
+- Officials join by scanning a short-lived QR code for their role: admin, head timekeeper, track operator, lane official (one code per lane) or check-in. No accounts or passwords. Any device can be revoked.
+- Families need no login: search for a scout, see the schedule and results live, and **☆ Follow** racers for "2 heats away", "on deck", "racing now" and "results posted" alerts.
+- Projector/TV displays for each track's on-deck list and the standings board.
+
+**Records and reliability**
+- Every change is in the audit log.
+- One-click full backup while the server is running, plus CSV exports of entries, standings and every heat.
+- Built and load-tested for race day: 6–9 officials and about 100 viewer phones on one laptop.
+
+## How it's used on race day
+
+The roles, and the page each one keeps open:
+
+| Who | Device | Page |
+| --- | --- | --- |
+| Admin (race director) | laptop | `/admin`: events, tracks, schedule, roster, officials, backups |
+| Check-in desk | phone or tablet | `/checkin` |
+| Track operator, one per track | phone | `/track/{id}/operate`: stage, arm, START |
+| Lane officials (regatta), one per lane | phone | `/track/{id}/lane/{n}`: big START/STOP button |
+| Head timekeeper | phone or tablet | `/timekeeper`: approve, edit or re-run |
+| Families | their own phones | `/`: search, follow, live results |
+| Projector or TV | any browser | `/display/ondeck/{track}`, `/display/standings` |
+
+**Before the day**
+1. Install and start the server (see [Quick start](#quick-start-laptop)), and open the one-time admin link on the race director's laptop.
+2. Create the event (derby or regatta), set its tracks and lane counts, and import the roster. Check the preview, then apply it.
+3. Practice with the simulator timer or `derbytime seed-demo`, and run the [load test](#load-testing) on a copy of the database if anything has changed.
+
+**Setting up at the venue**
+1. Put the laptop on the event Wi-Fi (not a guest or "client isolation" network; a phone hotspot or travel router works) and start `derbytime serve --host 0.0.0.0`. Allow it through the firewall.
+2. Post the server's address (`http://<laptop-LAN-IP>:8000`, printed when it starts) where families can see it, for example on a sign or the projector, so they can open the home page.
+3. On `/admin/officials`, create a QR code for each official's role. Each person scans theirs once and their phone opens straight to their page.
+
+**Check-in**
+- As families arrive, the check-in desk marks each scout checked in and records weight and inspection. Only checked-in scouts who pass inspection are scheduled.
+- When check-in closes, the admin presses *Generate schedule*. Late arrivals are fine later: check them in and press *Regenerate remaining heats*.
+
+**Racing each heat**
+1. The track operator presses **Stage next**. The track takes the earliest heat in the shared queue it can race, and the on-deck display and following families see who's up.
+2. Racers are placed on the track, and the operator presses **Arm**.
+3. Derby: the USB timer (or manual entry) reports the times. Regatta: the operator or any lane official presses **START** when the boats are released, every lane phone's clock starts, and each lane official presses **STOP** as their boat finishes, then **Submit** (or **DNF**).
+4. The heat waits as *pending* on the timekeeper's page. The head timekeeper approves it, edits a time with a reason, or calls a **Re-run** with a reason. A re-run goes straight back to the track.
+5. Approved results update standings, the displays and every family's phone within a few seconds, and the next heat is already being staged.
+
+Bad start? **Disarm** resets the heat and every lane phone. Broken lane? Untick it under *Lanes in use* and the remaining heats avoid it. A car breaks or a scout goes home? *Withdraw* them from their entry.
+
+**Finals and wrap-up**
+1. When the den runs are done, settle any ties the event page offers (*Add runoff*), then *Create final* for the top racers in each den.
+2. Race the final the same way, and present awards from the standings board.
+3. Download a full backup and the CSV exports from `/admin` before shutting down.
+
+The step-by-step reference for each screen is in [Running an event](#running-an-event).
 
 ## Quick start (laptop)
 
 Requires Python 3.11+.
 
 ```bash
-git clone <this repo> racemgr && cd racemgr
+git clone <this repo> derbytime && cd derbytime
 python -m venv .venv
 # Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
 pip install -e ".[dev]"            # or: pip install git+<repo-url>
-racemgr init-config                # writes ./config.toml (optional; defaults work)
-racemgr init-db
-racemgr seed-demo                  # demo derby + regatta, 2 dens, 20 scouts
-racemgr serve --host 0.0.0.0 --port 8000
+derbytime init-config                # writes ./config.toml (optional; defaults work)
+derbytime init-db
+derbytime seed-demo                  # demo derby + regatta, 2 dens, 20 scouts
+derbytime serve --host 0.0.0.0 --port 8000
 ```
 
 On first start with no admin device, the console prints a **one-time admin link**:
@@ -35,15 +104,29 @@ On first start with no admin device, the console prints a **one-time admin link*
 ========================================================================
 ```
 
-Open it, tap **Join on this device**, and that browser becomes the admin. If you get locked out, run `racemgr admin-url` to print a fresh link (it works while the server is running).
+Open it, tap **Join on this device**, and that browser becomes the admin. If you get locked out, run `derbytime admin-url` to print a fresh link (it works while the server is running).
 
 ### Reaching it from phones
 
 Phones on the same Wi-Fi use `http://<laptop-LAN-IP>:8000`. The app guesses the LAN IP for QR codes. If it guesses wrong (VPNs, multiple adapters), set `public_base_url` in `config.toml`.
 
-- **Windows:** allow Python through Windows Defender Firewall on *Private* networks when prompted, or run `netsh advfirewall firewall add rule name="racemgr" dir=in action=allow protocol=TCP localport=8000`.
+- **Windows:** allow Python through Windows Defender Firewall on *Private* networks when prompted, or run `netsh advfirewall firewall add rule name="derbytime" dir=in action=allow protocol=TCP localport=8000`.
 - **macOS:** accept the "allow incoming connections" prompt.
 - Guest or "client isolation" Wi-Fi networks block phone-to-laptop traffic. Use a normal network or a phone hotspot.
+
+## Installing from a wheel
+
+The package is pure Python and runs on Windows, macOS and Linux (including the Pi). Templates, static files and the default config ship inside the wheel, so a server machine needs no checkout:
+
+```bash
+pip wheel --no-deps -w dist .                 # on a dev machine: dist/derbytime-<version>-py3-none-any.whl
+pip install derbytime-<version>-py3-none-any.whl   # on the server, inside a venv
+derbytime --version
+```
+
+`python -m derbytime ...` works anywhere `derbytime ...` does, which helps when the venv's script folder isn't on `PATH`.
+
+Where the data lives: `--config PATH`, else `$DERBYTIME_CONFIG`, else `./config.toml`. `db_path` and `data_dir` (photos, backups, serial logs) are relative to that config file, or to the current directory when there is none. For an installed server, keep a config file in a dedicated folder and point `--config` at it, so the database doesn't land wherever the command happened to start.
 
 ### Optional HTTPS with mkcert (for Wake Lock etc.)
 
@@ -53,7 +136,7 @@ Everything works over plain HTTP. A few browser features need a *secure context*
 # install mkcert: https://github.com/FiloSottile/mkcert  (winget install FiloSottile.mkcert / brew install mkcert)
 mkcert -install
 mkcert 192.168.1.140 localhost 127.0.0.1      # use your LAN IP
-racemgr serve --ssl-certfile 192.168.1.140+2.pem --ssl-keyfile 192.168.1.140+2-key.pem
+derbytime serve --ssl-certfile 192.168.1.140+2.pem --ssl-keyfile 192.168.1.140+2-key.pem
 ```
 
 Each phone must trust mkcert's root CA. Run `mkcert -CAROOT` to find `rootCA.pem`, send it to the phone, and install it:
@@ -68,24 +151,24 @@ Tested target: Raspberry Pi 4/5 with Raspberry Pi OS (Bookworm, 64-bit), which s
 
 ```bash
 sudo apt update && sudo apt install -y python3-venv git
-git clone <this repo> ~/racemgr && cd ~/racemgr
+git clone <this repo> ~/derbytime && cd ~/derbytime
 python3 -m venv .venv && . .venv/bin/activate
 pip install -e .
-racemgr init-config && racemgr init-db
+derbytime init-config && derbytime init-db
 sudo usermod -aG dialout $USER     # access to USB serial timers (log out/in after)
 ```
 
-Run it as a service, saved as `/etc/systemd/system/racemgr.service`:
+Run it as a service, saved as `/etc/systemd/system/derbytime.service`:
 
 ```ini
 [Unit]
-Description=Scout Race Manager
+Description=Derby Time
 After=network-online.target
 
 [Service]
 User=pi
-WorkingDirectory=/home/pi/racemgr
-ExecStart=/home/pi/racemgr/.venv/bin/racemgr serve --host 0.0.0.0 --port 8000
+WorkingDirectory=/home/pi/derbytime
+ExecStart=/home/pi/derbytime/.venv/bin/derbytime serve --host 0.0.0.0 --port 8000
 Restart=on-failure
 
 [Install]
@@ -93,8 +176,8 @@ WantedBy=multi-user.target
 ```
 
 ```bash
-sudo systemctl daemon-reload && sudo systemctl enable --now racemgr
-journalctl -u racemgr -f          # shows the one-time admin link on first run
+sudo systemctl daemon-reload && sudo systemctl enable --now derbytime
+journalctl -u derbytime -f          # shows the one-time admin link on first run
 ```
 
 Set USB timer ports per track on the admin event page, for example `/dev/ttyUSB0`. For stable names, use `/dev/serial/by-id/...`. The Pi's offline **Wi-Fi access point** setup (hostapd/dnsmasq or NetworkManager hotspot, plus a captive DNS name) is a later phase. Until then, run the Pi on a normal Wi-Fi network or a travel router.
@@ -103,7 +186,7 @@ All assets are local (htmx is vendored in `static/vendor`), so nothing needs the
 
 ## Configuration
 
-`config.toml` (see [config.example.toml](src/racemgr/config.example.toml) for every key) holds:
+`config.toml` (see [config.example.toml](src/derbytime/config.example.toml) for every key) holds:
 
 | Section | What |
 | --- | --- |
@@ -114,7 +197,7 @@ All assets are local (htmx is vendored in `static/vendor`), so nothing needs the
 
 Events, tracks, rosters and schedules live in the database and are edited from `/admin`. Per-track overrides (lane count, timing source, serial port, outlier limits) are saved on the track itself.
 
-Lookup order for the config file: `--config PATH`, then `$RACEMGR_CONFIG`, then `./config.toml`, then built-in defaults.
+Lookup order for the config file: `--config PATH`, then `$DERBYTIME_CONFIG`, then `./config.toml`, then built-in defaults. `$RACEMGR_CONFIG` (the variable's name before the rename) still works. The default database file is still `racemgr.db`, so an existing install keeps its data.
 
 ## Running an event
 
@@ -184,7 +267,7 @@ Every change is in the audit log.
 
 ### Backup and export
 
-- **Full backup:** *Download backup* on `/admin`, or `racemgr backup [PATH]` from the command line. Both make a consistent copy of the whole SQLite database (every event, scout, result, official and the audit log), and both are safe while the server is running. Copies are also kept in `<data_dir>/backups/`. To restore: stop the server, delete `racemgr.db-wal` and `racemgr.db-shm`, and copy the backup over `racemgr.db`.
+- **Full backup:** *Download backup* on `/admin`, or `derbytime backup [PATH]` from the command line. Both make a consistent copy of the whole SQLite database (every event, scout, result, official and the audit log), and both are safe while the server is running. Copies are also kept in `<data_dir>/backups/`. To restore: stop the server, delete `racemgr.db-wal` and `racemgr.db-shm`, and copy the backup over `racemgr.db`.
 - **CSV exports** for spreadsheets, linked at the top of each event's admin page:
   - *entries*: the roster plus car number and name, check-in, weight, inspection, and race status. It uses the importer's column names, so it imports back cleanly.
   - *standings*: every den, the final and the pack overall, with disqualified scouts listed as `DQ`.
@@ -206,7 +289,7 @@ Ties are scores equal to the thousandth. They share a rank until a runoff separa
 ## Architecture
 
 ```
-src/racemgr/
+src/derbytime/
   core/            pure Python: lane rotation, multi-track planner, placing/standings/ties  (no web/DB imports, enforced by a test)
   models.py        SQLModel tables
   services/        heat lifecycle (race.py), schedule & standings, alerts, roster, audit
@@ -242,7 +325,7 @@ python tools/loadtest.py local --db racemgr.db
 
 # another machine as the server
 python tools/loadtest.py prepare --db racemgr.db --out lt          # on the server
-racemgr --config lt/config.toml serve --port 8765                  # on the server
+derbytime --config lt/config.toml serve --port 8765                  # on the server
 python tools/loadtest.py run --url http://SERVER-IP:8765 --plan lt/plan.json   # from a laptop
 ```
 
@@ -254,3 +337,7 @@ The database schema is created with `create_all`. New nullable columns (and thei
 
 - Phase 2: MicroWizard / Champ / Arduino gate parsers
 - Later: awards and voting, Pi access-point setup, Web Push, Alembic migrations
+
+## License
+
+MIT. See [LICENSE](LICENSE).

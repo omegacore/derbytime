@@ -1,5 +1,5 @@
-# Scout Race Manager configuration.
-# Copy to ./config.toml (or pass --config PATH / set RACEMGR_CONFIG).
+# Derby Time configuration.
+# Copy to ./config.toml (or pass --config PATH / set DERBYTIME_CONFIG).
 # Events, tracks and rosters live in the database and are edited from /admin;
 # this file holds server settings, timer hardware settings, and the defaults
 # used when a new track or event is created.
