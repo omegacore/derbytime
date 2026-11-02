@@ -37,6 +37,19 @@ These rules come from load-testing a real failure. Re-run `tools/loadtest.py` af
 - **Fan-out:** every event wakes every phone whose `data-live` keys match, so give public panels the narrowest keys that keep them correct, plus `data-jitter`. Admin schedule changes reach viewers only via `track.state` (the `track` key).
 - **Lane timing** is stamped on the phone in server-clock ms (`clock.js`), queued in localStorage and retried, and is idempotent by `submission_id`, so a slow server delays results but doesn't change them. Keep `/api/time` async and cheap: clock error is up to half its round trip.
 
+## Parallel work in worktrees
+
+Several sessions work at once, each in its own worktree under `.claude/worktrees/`. One orchestrating session in the main checkout merges finished branches and restarts the race server between heats. It learns what is finished only from the task board, so keep yours current.
+
+- **Task board:** `C:\Users\omegacore\workspace\derbytime\spec.md`. It is gitignored and lives only in the main checkout, so worktrees have no copy: always use this absolute path. Edit only your own task's section.
+- **Starting:** if your task has no section, add one from the template at the top of the board, with `Status: in progress`.
+- **Finishing:** commit on your branch, `git rebase main`, run the full suite *against your worktree's code* (below), then set `Status: ready` and fill in `Deploy notes`. Do this last, after everything is committed. If you change anything after that, set `Status: in progress` first and `ready` again when done.
+- **Need the user?** Set `Status: blocked: <why>`.
+- **Never** commit to `main` or edit files in the main checkout. The server runs from there, and static files reach phones on the next reload, mid-race. Don't set `merged` or remove your worktree; the orchestrator does both.
+- **Testing in a worktree:** the venv's editable install points at the main checkout's `src`, so a plain `pytest` tests `main`, not your branch. From the worktree root: `PYTHONPATH="$PWD/src" ../../../.venv/Scripts/python -m pytest -q` (the load test also needs `PYTHONPATH`).
+- **Dev servers:** port 8001 or up, on a copy of the DB with your own `config.toml` (`RACEMGR_CONFIG`). Never port 8000 or the real `racemgr.db`.
+- Line endings are LF (`.gitattributes`). If `git diff --stat main` shows whole-file changes, your editor wrote CRLF: run `git add --renormalize .` and commit.
+
 ## Conventions
 
 - Match the surrounding style: short docstrings that explain *why*, small helpers, no new dependencies without a reason.
