@@ -200,6 +200,12 @@ def test_admin_creates_lane_codes_with_qr(admin, app):
     # lane official without lane is rejected
     r = admin.post("/admin/tokens", data={"role": "lane_official", "track_id": g.id})
     assert "need a track and lane" in r.text
+    # the lane must exist on the track, and needs a track to check against
+    r = admin.post("/admin/tokens", data={"role": "lane_official", "track_id": g.id, "lane": 3})
+    assert "has lanes 1–2" in r.text
+    r = admin.post("/admin/tokens", data={"role": "lane_official", "event_id": g.event_id, "lane": 1})
+    assert "Choose the track" in r.text
+    assert f'data-lanes="2"' in admin.get("/admin/officials").text
 
 
 def test_lane_official_scope_and_revoke(app, admin):

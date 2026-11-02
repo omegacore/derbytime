@@ -23,11 +23,11 @@
         <select name="track_id" id="track">
           <option value="">Any / none</option>
           {% for ev in open_events %}<optgroup label="{{ ev.name }}" data-event="{{ ev.id }}">
-            {% for t in tracks.values() if t.event_id == ev.id %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+            {% for t in tracks.values() if t.event_id == ev.id %}<option value="{{ t.id }}" data-lanes="{{ t.lane_count }}" data-off="{{ (t.disabled_lanes or []) | join(',') }}">{{ t.name }}</option>{% endfor %}
           </optgroup>{% endfor %}
         </select>
       </label>
-      <label>Lane <input name="lane" type="number" min="1" max="12" style="width:4.5em"></label>
+      <label>Lane <select name="lane" id="lane"><option value="">—</option></select></label>
       <label><input type="checkbox" name="all_lanes"> One code per lane</label>
     </div>
     <div class="row">
@@ -42,6 +42,16 @@
 <script>
 (() => {
   const role = document.getElementById('role'), ev = document.getElementById('event'), track = document.getElementById('track');
+  const lane = document.getElementById('lane');
+  function syncLanes() {
+    // offer only the chosen track's lanes, keeping the pick if it still exists
+    const t = track.selectedOptions[0], n = +(t?.dataset.lanes || 0), off = (t?.dataset.off || '').split(',');
+    const keep = lane.value;
+    lane.replaceChildren(new Option('—', ''));
+    for (let i = 1; i <= n; i++) lane.add(new Option(off.includes(String(i)) ? `${i} (out)` : String(i), i));
+    lane.value = +keep <= n ? keep : '';
+    lane.disabled = !n;
+  }
   function sync() {
     const admin = role.value === 'admin';
     document.getElementById('event-field').hidden = admin;
@@ -50,9 +60,11 @@
     // only this event's tracks; clear a track left over from another event
     for (const g of track.querySelectorAll('optgroup')) g.hidden = g.disabled = g.dataset.event !== ev.value;
     if (track.selectedOptions[0]?.parentElement.disabled) track.value = '';
+    syncLanes();
   }
   role.addEventListener('change', sync);
   ev.addEventListener('change', sync);
+  track.addEventListener('change', syncLanes);
   sync();
 })();
 </script>

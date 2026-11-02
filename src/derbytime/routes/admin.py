@@ -467,6 +467,12 @@ async def admin_create_token(request: Request, s: Session = Depends(get_session)
             event_id = ev.id
         else:
             track_id = lane = None  # admins run every event
+        if lane is not None:
+            t = s.get(Track, track_id) if track_id else None
+            if t is None:
+                raise ServiceError("Choose the track for that lane.")
+            if not 1 <= lane <= t.lane_count:
+                raise ServiceError(f"{t.name} has lanes 1–{t.lane_count}.")
         if role == Role.lane_official and f.get("all_lanes") == "on" and track_id:
             t = s.get(Track, track_id)
             for n in range(1, t.lane_count + 1):
