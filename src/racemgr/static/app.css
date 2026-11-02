@@ -146,7 +146,8 @@ body.kiosk main { max-width: none; padding: 2vw; }
 }
 
 /* standings board: one slide per den, themed by rank colour */
-body.board { background: #001a3d; overflow: hidden; }
+/* scoreboard face: DIN-style, installed on Windows (the board laptop) and iOS/macOS, so it works offline */
+body.board { background: #001a3d; overflow: hidden; font-family: Bahnschrift, "DIN Alternate", "Roboto Condensed", "Arial Narrow", sans-serif; font-variant-numeric: tabular-nums; }
 body.board main { max-width: none; padding: 0; }
 [data-board] { position: fixed; inset: 0; }
 .slide {
