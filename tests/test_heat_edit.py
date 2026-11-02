@@ -1,4 +1,4 @@
-"""Hand-editing a run's unraced heats (e.g. fixing a heat with only one car)."""
+"""Hand-editing a run's unraced heats (e.g. fixing a heat with only one racer)."""
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
@@ -61,10 +61,10 @@ def test_reorder_empty_and_add_heats(session, solo_run):
     ev, rnd = solo_run
     rows, version = editor_rows(session, ev, rnd)
     (h1, l1), (h2, l2) = rows
-    solo_car = next(e for e in l2.values() if e)
+    solo_racer = next(e for e in l2.values() if e)
     # empty the solo heat, and split heat 1 into two heats of two (the new one goes first)
     keep = {l: e for l, e in l1.items() if l in (1, 2)}
-    new = {1: l1[3], 2: l1[4], 3: solo_car, 4: None}
+    new = {1: l1[3], 2: l1[4], 3: solo_racer, 4: None}
     rows = [("new", new), (h1, {**keep, 3: None, 4: None}), (h2, {l: None for l in l2})]
     r = save_heat_lineups(session, ev, rnd, version, rows, ACTOR)
     session.commit()
@@ -130,7 +130,7 @@ def test_heat_editor_pages(settings, engine, session, solo_run):
         session.commit()
         client.post(f"/join/{jt.token}", follow_redirects=False)
 
-        assert "1 car" in client.get(f"/admin/event/{ev.id}").text
+        assert "1 racer" in client.get(f"/admin/event/{ev.id}").text
         page = client.get(f"/admin/round/{rnd.id}/heats")
         assert page.status_code == 200 and "Races per scout" in page.text
 

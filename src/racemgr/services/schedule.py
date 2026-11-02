@@ -449,10 +449,10 @@ def _editable(heat: Heat) -> bool:
 
 
 def solo_heats(session: Session, round_ids: list[int]) -> dict[int, int]:
-    """Round id -> unraced heats with only one car in them."""
+    """Round id -> unraced heats with only one racer in them."""
     heats = list(session.exec(select(Heat).where(col(Heat.round_id).in_(round_ids), Heat.status == HeatStatus.scheduled)))
-    cars = views.occupied_lanes(session, [h.id for h in heats])
-    return dict(Counter(h.round_id for h in heats if len(cars[h.id]) == 1))
+    racers = views.occupied_lanes(session, [h.id for h in heats])
+    return dict(Counter(h.round_id for h in heats if len(racers[h.id]) == 1))
 
 
 def _new_heat_track(session: Session, event: Event, rnd: Round) -> Track:
@@ -462,7 +462,7 @@ def _new_heat_track(session: Session, event: Event, rnd: Round) -> Track:
 
 
 def _edit_choices(session: Session, rnd: Round, heat_lanes: dict[int, list[HeatLane]]) -> dict[int, dict[str, Any]]:
-    """Cars that may go in this run's heats: the den's racing scouts (or the
+    """Racers who may go in this run's heats: the den's racing scouts (or the
     runoff's/final's own entries), plus anyone already in it."""
     ids = set(_round_members(session, rnd, den_entries(session, rnd.event_id)))
     ids |= {hl.entry_id for ls in heat_lanes.values() for hl in ls if hl.entry_id}
@@ -502,7 +502,7 @@ def save_heat_lineups(
     """Replace a run's unraced heats with a hand-edited lineup.
 
     ``rows`` is the new queue order: (heat id, or "new" for an added heat,
-    {lane: entry id or None}). A heat left with no cars is deleted. Raced
+    {lane: entry id or None}). A heat left with no racers is deleted. Raced
     heats aren't touched. ``version`` lists the unraced heat ids the editor
     was showing; if a heat was staged or the run rebuilt since, nothing is
     saved.
@@ -525,14 +525,14 @@ def save_heat_lineups(
         allowed = {hl.lane for hl in lanes[heat.id]} if heat else set(new_lanes)
         if set(lineup) - allowed:
             raise ServiceError(f"Row {pos}: lane {min(set(lineup) - allowed)} isn't on that heat's track.")
-        cars = [e for e in lineup.values() if e is not None]
-        if any(e not in choices for e in cars):
-            raise ServiceError(f"Row {pos}: that car isn't in this run.")
-        if dup := [e for e, n in Counter(cars).items() if n > 1]:
+        racers = [e for e in lineup.values() if e is not None]
+        if any(e not in choices for e in racers):
+            raise ServiceError(f"Row {pos}: that racer isn't in this run.")
+        if dup := [e for e, n in Counter(racers).items() if n > 1]:
             raise ServiceError(f"Row {pos}: #{choices[dup[0]]['number']} is in two lanes of the same heat.")
         if heat:
             seen.add(heat.id)
-        if cars or heat:
+        if racers or heat:
             plan.append((heat, {l: lineup.get(l) for l in sorted(allowed)}))
     if seen != set(editable):
         raise ServiceError("A heat is missing from the list. Reload and try again.")

@@ -337,7 +337,7 @@ def get_round(s: Session, round_id: int) -> Round:
 
 @router.get("/round/{round_id}/heats")
 def admin_heats(round_id: int, request: Request, s: Session = Depends(get_session), me=Depends(get_official)):
-    """Hand-edit a run's unraced heats (e.g. to fix a heat with one car)."""
+    """Hand-edit a run's unraced heats (e.g. to fix a heat with one racer)."""
     admin_only(me)
     rnd = get_round(s, round_id)
     ev = get_event(s, rnd.event_id)

@@ -127,7 +127,7 @@
         <span class="handle" aria-hidden="true">☰</span>
         <span class="order-name"><strong>{{ o.round.name }}</strong>
           <span class="small muted">{{ o.done }}/{{ o.total }} heats{% if o.round.races %} · {{ o.round.races }} race{{ '' if o.round.races == 1 else 's' }} each{% endif %}{% if multi_track and o.tracks %} · {{ o.tracks | join(' + ') }}{% endif %}
-            · <a href="/admin/round/{{ o.round.id }}/heats">edit heats</a>{% if o.solo %} <span class="flag">· {{ o.solo }} heat{{ '' if o.solo == 1 else 's' }} with 1 car</span>{% endif %}</span></span>
+            · <a href="/admin/round/{{ o.round.id }}/heats">edit heats</a>{% if o.solo %} <span class="flag">· {{ o.solo }} heat{{ '' if o.solo == 1 else 's' }} with 1 racer</span>{% endif %}</span></span>
         <span class="badge {{ 'approved' if o.state == 'done' else 'armed' if o.state == 'racing' else 'scheduled' }}">{{ o.state }}</span>
         <span class="order-btns">
           <button type="button" class="small" data-move="-1" aria-label="Move up">↑</button>

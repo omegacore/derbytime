@@ -12,7 +12,7 @@
 <h1>{{ round.name }} <span class="muted small">heats</span></h1>
 
 <section class="card">
-  <p class="small muted">Pick a car for each lane to rearrange the heats that haven't raced yet. Use ↑ ↓ to change the order they race in. Empty every lane of a heat to remove it, or add a heat at the bottom. Raced and staged heats are shown greyed out and can't change. Saving puts the new lineups on the tracks right away.</p>
+  <p class="small muted">Pick a racer for each lane to rearrange the heats that haven't raced yet. Use ↑ ↓ to change the order they race in. Empty every lane of a heat to remove it, or add a heat at the bottom. Raced and staged heats are shown greyed out and can't change. Saving puts the new lineups on the tracks right away.</p>
   <p class="small muted"><strong>Note:</strong> regenerating the schedule, changing a track's lanes, or withdrawing a scout rebuilds every unraced heat and replaces these edits.</p>
 
   <form method="post" action="/admin/round/{{ round.id }}/heats" id="heat-editor" data-target="{{ target or '' }}">

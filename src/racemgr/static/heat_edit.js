@@ -29,7 +29,7 @@
       const warn = tr.querySelector("[data-warn]");
       const dup = Object.values(counts).some((c) => c > 1);
       tr.classList.toggle("solo", picks.length === 1);
-      warn.textContent = dup ? "same car twice" : picks.length === 1 ? "only 1 car" : picks.length === 0 ? "empty: removed on save" : "";
+      warn.textContent = dup ? "same racer twice" : picks.length === 1 ? "only 1 racer" : picks.length === 0 ? "empty: removed on save" : "";
       warn.classList.toggle("flag", dup || picks.length === 1);
       tr.querySelector("[data-number]").textContent = picks.length ? base + ++n : "–";
     });
@@ -78,7 +78,7 @@
   form.addEventListener("submit", (e) => {
     if (form.querySelector("select.dup")) {
       e.preventDefault();
-      RM.toast("A car is in two lanes of the same heat", "err");
+      RM.toast("A racer is in two lanes of the same heat", "err");
     }
   });
 
