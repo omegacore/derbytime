@@ -64,6 +64,12 @@
     return s.length ? Math.min(...s) : null;
   }
 
+  // STOP is ignored for the first second after the start, so a reflex tap
+  // (or a double tap on START) can't end the race early. Returns ms left.
+  const STOP_LOCK_MS = 1000;
+  let unlockTimer = 0;
+  const stopLocked = () => (start() === null ? 0 : STOP_LOCK_MS - (now() - start()));
+
   async function lockScreen() {
     if (!("wakeLock" in navigator)) {
       wakeEl.textContent = window.isSecureContext ? "Screen may sleep (no Wake Lock support)" : "Screen may sleep (Wake Lock needs HTTPS)";
@@ -145,7 +151,10 @@
     const already = heatId && (done().includes(heatId) || i.hasResult);
     big.className = "sw-big";
     if (state === "running") {
-      big.textContent = "STOP"; big.classList.add("stop"); big.disabled = false;
+      big.textContent = "STOP"; big.classList.add("stop");
+      const left = stopLocked();
+      big.disabled = left > 0;
+      if (left > 0) { clearTimeout(unlockTimer); unlockTimer = setTimeout(render, left + 20); }
     } else if (state === "stopped") {
       big.textContent = fmt(stopAt - start()); big.classList.add("wait"); big.disabled = true;
     } else if (i.armed && i.occupied && !already) {
@@ -189,6 +198,7 @@
       begin();
       sendStart(t);
     } else if (state === "running") {
+      if (stopLocked() > 0) return;
       stopAt = t;
       state = "stopped";
       cancelAnimationFrame(raf);

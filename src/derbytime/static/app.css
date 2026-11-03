@@ -137,6 +137,10 @@ body.kiosk main { max-width: none; padding: 2vw; }
 .sw-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .sw-actions button { min-height: 64px; font-size: 1.2rem; }
 .sw-status { text-align: center; min-height: 1.5em; }
+/* operator START (human timing) */
+.start-panel { display: grid; gap: 8px; margin-top: 12px; }
+.start-btn { width: 100%; min-height: 22vh; font-size: clamp(36px, 10vw, 64px); font-weight: 800; border-radius: 24px; border: 0; background: var(--ok); color: #fff; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.start-running { font-size: clamp(40px, 14vw, 96px); font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; line-height: 1; }
 .lane-info { text-align: center; }
 .lane-info .racer { font-size: 1.6rem; font-weight: 700; }
 
