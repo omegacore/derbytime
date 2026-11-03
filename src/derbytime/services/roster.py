@@ -15,6 +15,9 @@ stored. Optional extras: ``number`` (car/boat number; otherwise the scout keeps
 their pack number, or draws a random free one from 10 up) and
 ``car_name``. Short headers like ``first_name`` also work.
 
+Those headers are only a guess: the preview lets the admin pick which header
+feeds each field (``columns``), so other roster formats import too.
+
 Importing is a sync: ``plan_import`` compares the file with the database and
 ``apply_import`` carries the plan out, so the admin can preview it first.
 Scouts are never deleted by an import; ones no longer Active are marked
@@ -41,6 +44,17 @@ ALIASES = {
     "group": "den", "den name": "den",
     "car": "car_name", "boat": "car_name", "boat_name": "car_name", "boat name": "car_name", "car name": "car_name",
     "car number": "number", "car_number": "number", "boat number": "number", "#": "number",
+}
+
+# fields an import can fill, in the order the preview asks about them
+FIELDS = {
+    "first_name": "First name",
+    "last_name": "Last name",
+    "member_id": "Member ID",
+    "den": "Den",
+    "status": "Status (only “Active” rows race)",
+    "number": "Car/boat number",
+    "car_name": "Car/boat name",
 }
 
 
@@ -157,6 +171,8 @@ class ImportPlan:
     has_status: bool
     # active scouts entered in this event that the file doesn't list
     not_in_file: list[str] = field(default_factory=list)
+    headers: list[str] = field(default_factory=list)
+    columns: dict[str, str | None] = field(default_factory=dict)  # field -> header used
 
     def of(self, *kinds: str) -> list[RosterRow]:
         return [r for r in self.rows if r.kind in kinds]
@@ -192,23 +208,57 @@ class ImportResult:
         return msg
 
 
-def _parse(text: str) -> tuple[list[RosterRow], bool]:
+def _reader(text: str) -> csv.DictReader:
     text = text.lstrip("﻿")
-    reader = csv.DictReader(io.StringIO(text), delimiter=_dialect(text))
-    if not reader.fieldnames:
-        raise ServiceError("The roster file is empty.")
+    return csv.DictReader(io.StringIO(text), delimiter=_dialect(text))
 
+
+def read_headers(text: str) -> list[str]:
+    """The file's header row, for the preview's column pickers."""
+    return [h for h in (_reader(text).fieldnames or []) if h and h.strip()]
+
+
+def sample_values(text: str) -> dict[str, str]:
+    """First non-empty value under each header, so the pickers show what a column holds."""
+    samples: dict[str, str] = {}
+    for i, raw in enumerate(_reader(text)):
+        for h, v in raw.items():
+            if h and isinstance(v, str) and v.strip() and h not in samples:
+                samples[h] = _clean(v)[:30]
+        if i >= 20:
+            break
+    return samples
+
+
+def guess_columns(headers: list[str]) -> dict[str, str | None]:
+    """Map each field to the first header that looks like it (by ``ALIASES``)."""
     def norm_key(k: str) -> str:
         key = _clean(k).lower()
         return ALIASES.get(key, key.replace(" ", "_"))
 
-    keys = {norm_key(k) for k in reader.fieldnames if k}
-    if "first_name" not in keys:
-        raise ServiceError("Couldn't find a “Scout First Name” column. Check the header row of the roster export.")
-    has_status = "status" in keys
+    guessed: dict[str, str | None] = dict.fromkeys(FIELDS)
+    for h in headers:
+        key = norm_key(h)
+        if key in guessed and guessed[key] is None:
+            guessed[key] = h
+    return guessed
+
+
+def _parse(text: str, columns: dict[str, str | None] | None = None) -> tuple[list[RosterRow], dict[str, str | None]]:
+    reader = _reader(text)
+    headers = read_headers(text)
+    if not headers:
+        raise ServiceError("The roster file is empty.")
+    if columns is None:
+        columns = guess_columns(headers)
+    # a header the file doesn't have (an older form, a different file) counts as unpicked
+    columns = {f: (columns.get(f) if columns.get(f) in headers else None) for f in FIELDS}
+    if not columns["first_name"]:
+        raise ServiceError("Couldn't find a “Scout First Name” column. Pick which column holds the first name.")
+    has_status = columns["status"] is not None
     rows = []
     for lineno, raw in enumerate(reader, start=2):
-        norm = {norm_key(k): (v or "").strip() for k, v in raw.items() if k is not None and isinstance(v, str)}
+        norm = {f: (raw.get(h) or "").strip() if h else "" for f, h in columns.items()}
         first = _clean(norm.get("first_name", ""))
         if not first:
             continue
@@ -230,12 +280,14 @@ def _parse(text: str) -> tuple[list[RosterRow], bool]:
                 car_name=norm.get("car_name") or None,
             )
         )
-    return rows, has_status
+    return rows, columns
 
 
-def plan_import(session: Session, event: Event, text: str) -> ImportPlan:
-    """Compare a roster file with the database. Writes nothing."""
-    rows, has_status = _parse(text)
+def plan_import(session: Session, event: Event, text: str, columns: dict[str, str | None] | None = None) -> ImportPlan:
+    """Compare a roster file with the database. Writes nothing. ``columns``
+    maps fields to the file's headers; without it they are guessed."""
+    rows, columns = _parse(text, columns)
+    has_status = columns["status"] is not None
     racers = list(session.exec(select(Racer)))
     groups = {g.id: g.name for g in session.exec(select(Group))}
     by_mid = {r.member_id: r for r in racers if r.member_id}
@@ -294,7 +346,7 @@ def plan_import(session: Session, event: Event, text: str) -> ImportPlan:
         select(Entry, Racer).join(Racer, Racer.id == Entry.racer_id).where(Entry.event_id == event.id).order_by(Entry.number)
     ).all()
     not_in_file = [f"#{e.number} {r.display_name}" for e, r in missing if r.id not in listed and r.active]
-    return ImportPlan(rows, has_status, not_in_file)
+    return ImportPlan(rows, has_status, not_in_file, read_headers(text), columns)
 
 
 def apply_import(session: Session, event: Event, plan: ImportPlan, actor: Actor, checked_in: bool = False) -> ImportResult:

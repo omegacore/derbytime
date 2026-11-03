@@ -13,6 +13,36 @@
 {% block content %}
 <p class="small"><a href="/admin/event/{{ event.id }}">← {{ event.name }}</a></p>
 <h1>Roster import preview</h1>
+{% macro column_fields() %}
+  <input type="hidden" name="columns" value="1">
+  {% for key in fields %}<input type="hidden" name="col_{{ key }}" value="{{ columns[key] or '' }}">{% endfor %}
+{% endmacro %}
+
+<section class="card">
+  <h2>Columns</h2>
+  {% if error %}<p class="msg err">{{ error }}</p>{% endif %}
+  <p class="small muted">Which column of the file holds each detail. Columns not picked here are ignored and not stored.</p>
+  <form method="post" action="/admin/event/{{ event.id }}/import">
+    <textarea name="csv_text" hidden>{{ text }}</textarea>
+    <input type="hidden" name="columns" value="1">
+    {% if checked_in %}<input type="hidden" name="checked_in" value="on">{% endif %}
+    <div class="table-wrap"><table class="small">
+      <tbody>{% for key, label in fields.items() %}
+        <tr><td><label for="col-{{ key }}">{{ label }}{% if key == 'first_name' %} <span class="muted">(required)</span>{% endif %}</label></td>
+          <td><select id="col-{{ key }}" name="col_{{ key }}" style="width:100%">
+            <option value="">(none)</option>
+            {% for h in headers %}<option value="{{ h }}" {% if columns[key] == h %}selected{% endif %}>{{ h }}{% if samples.get(h) %} · e.g. {{ samples[h] }}{% endif %}</option>{% endfor %}
+          </select></td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+    <div class="row" style="margin-top:8px">
+      <button type="submit">Update preview</button>
+      {% if not plan %}<a class="btn" href="/admin/event/{{ event.id }}">Cancel</a>{% endif %}
+    </div>
+  </form>
+</section>
+
+{% if plan %}
 {% set new = plan.of('new') %}{% set upd = plan.of('update') %}{% set react = plan.of('reactivate') %}{% set deact = plan.of('deactivate') %}
 {% set skip = plan.of('skip') %}{% set same = plan.of('same') %}
 
@@ -29,6 +59,7 @@
   <form method="post" action="/admin/event/{{ event.id }}/import" class="row">
     <textarea name="csv_text" hidden>{{ text }}</textarea>
     <input type="hidden" name="apply" value="1">
+    {{ column_fields() }}
     {% if checked_in %}<input type="hidden" name="checked_in" value="on">{% endif %}
     <button class="primary" type="submit" {% if not plan.changed %}disabled{% endif %}>Apply import</button>
     <a class="btn" href="/admin/event/{{ event.id }}">Cancel</a>
@@ -53,5 +84,6 @@
   <p class="small muted">Nothing happens to them. If they've left, mark them inactive or withdraw them from the roster page.</p>
   <p class="small">{{ plan.not_in_file | join(', ') }}</p>
 </section>
+{% endif %}
 {% endif %}
 {% endblock %}

@@ -121,6 +121,30 @@ def test_import_rejects_used_numbers(session, settings):
         plan_import(session, ev, "first_name,number\nBo,7\n")
 
 
+
+def test_import_with_picked_columns(session, settings):
+    """A roster with unfamiliar headers imports once the admin picks the columns."""
+    ev = create_event(session, settings, "Derby", EventType.derby, ACTOR)
+    text = "Given,Family,Patrol,Enrolled,ID\nKyle,Smith,Den 1,Active,111\nOld,Kid,Den 2,Dropped,222\n"
+    with pytest.raises(ServiceError, match="first name"):
+        plan_import(session, ev, text)
+    cols = {"first_name": "Given", "last_name": "Family", "den": "Patrol", "status": "Enrolled", "member_id": "ID"}
+    plan = plan_import(session, ev, text, cols)
+    assert plan.headers == ["Given", "Family", "Patrol", "Enrolled", "ID"]
+    assert [(r.name, r.den, r.member_id, r.kind) for r in plan.rows] == [("Kyle Smith", "Den 1", "111", "new"), ("Old Kid", "Den 2", "222", "skip")]
+    # unpicking Status makes every row count as Active; a header not in the file is ignored
+    plan = plan_import(session, ev, text, cols | {"status": None, "car_name": "Nope"})
+    assert not plan.has_status and [r.kind for r in plan.rows] == ["new", "new"]
+    assert plan.columns["car_name"] is None
+
+
+def test_import_guesses_columns(session, settings):
+    ev = create_event(session, settings, "Derby", EventType.derby, ACTOR)
+    plan = plan_import(session, ev, HEADER + "Kyle,Smith,111,Active,Den 1\n")
+    assert plan.columns == {"first_name": "Scout First Name", "last_name": "Scout Last Name", "member_id": "Member ID",
+                            "den": "Den", "status": "Status", "number": None, "car_name": None}
+
+
 def test_inactive_scouts_are_not_scheduled(session, settings, demo):
     derby, _ = demo
     before = len(eligible_entries(session, derby.id))
@@ -283,3 +307,22 @@ def test_roster_admin_needs_admin(app, client):  # noqa: F811
     join(app, client, Role.checkin)
     for url in ("/admin/roster", "/admin/racer/1", "/admin/backup", "/admin/roster.csv", "/admin/event/1/export/heats.csv"):
         assert client.get(url).status_code == 403
+
+
+def test_import_preview_asks_for_columns(app, admin):  # noqa: F811
+    with Session(app.state.engine) as s:
+        ev = s.exec(select(Event).where(Event.type == EventType.derby)).first()
+        before = len(s.exec(select(Racer)).all())
+    url = f"/admin/event/{ev.id}/import"
+    text = "Given,Family,Patrol\nZed,Quinn,Den 9\n"
+    # unrecognised headers: the preview shows the pickers (with sample values) instead of failing
+    page = admin.post(url, data={"csv_text": text}).text
+    assert "Pick which column holds the first name" in page and "e.g. Zed" in page and "Apply import" not in page
+    cols = {"columns": "1", "col_first_name": "Given", "col_last_name": "Family", "col_den": "Patrol"}
+    page = admin.post(url, data={"csv_text": text} | cols).text
+    assert "Zed Quinn" in page and "Apply import" in page and 'name="col_den" value="Patrol"' in page
+    r = admin.post(url, data={"csv_text": text, "apply": "1"} | cols, follow_redirects=False)
+    assert "Imported+1" in r.headers["location"] or "Imported%201" in r.headers["location"]
+    with Session(app.state.engine) as s:
+        assert len(s.exec(select(Racer)).all()) == before + 1
+        assert s.exec(select(Racer).where(Racer.first_name == "Zed")).one().last_name == "Quinn"

@@ -255,15 +255,24 @@ async def admin_import(event_id: int, request: Request, s: Session = Depends(get
         if data:
             text = data.decode("utf-8-sig", errors="replace")
     checked_in = f.get("checked_in") == "on"
+    # the preview's column pickers post col_<field>; the first upload has none, so guess
+    columns = {k: f.get(f"col_{k}") or None for k in roster.FIELDS} if f.get("columns") else None
     url = f"/admin/event/{ev.id}"
+    ctx = {"event": ev, "text": text, "checked_in": checked_in, "fields": roster.FIELDS, "samples": roster.sample_values(text)}
     try:
-        plan = roster.plan_import(s, ev, text)
+        plan = roster.plan_import(s, ev, text, columns)
         if not f.get("apply"):
-            return render(request, "admin/import_preview.html", {"event": ev, "plan": plan, "text": text, "checked_in": checked_in})
+            return render(request, "admin/import_preview.html", ctx | {"plan": plan, "headers": plan.headers, "columns": plan.columns})
         result = roster.apply_import(s, ev, plan, auth.actor_for(me), checked_in)
         s.commit()
     except ServiceError as e:
         s.rollback()
+        headers = roster.read_headers(text)
+        if headers and not f.get("apply"):
+            # usually no first-name column was recognised: let the admin pick the columns
+            picked = columns or roster.guess_columns(headers)
+            return render(request, "admin/import_preview.html",
+                          ctx | {"plan": None, "error": e.message, "headers": headers, "columns": picked})
         return back(url, e.message, True)
     return back(url, result.message)
 
