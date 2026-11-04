@@ -69,7 +69,7 @@ def test_seed_builds_balanced_schedules(session, demo):
     derby, regatta = demo
     (main,) = tracks_of(session, derby)
     rounds = group_rounds(session, derby.id)
-    # two runs per den, snaking down the (name-sorted) dens and back up
+    # two runs per den, snaking down the dens (no prefix: same place, so by name) and back up
     assert [r.name for r in rounds] == ["Bear Den 5", "Wolf Den 3", "Wolf Den 3 · run 2", "Bear Den 5 · run 2"]
     heats = session.exec(select(Heat).where(Heat.track_id == main.id)).all()
     assert len(heats) == 40  # 10 entries per den, one heat each per run, 2 runs, 2 dens

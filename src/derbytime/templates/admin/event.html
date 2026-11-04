@@ -88,7 +88,7 @@
 <section class="card">
   <h2>Schedule</h2>
   {% if not has_schedule %}
-    <p class="muted small">Each <strong>run</strong> races every car in a den the chosen number of times, spread over the lanes. With one race per lane ({{ default_races }}), every car runs every lane once. Fewer races make a shorter run; if the cars don't fill the last heat, its empty lanes are skipped and the heat finishes once its cars have times. Dens are sorted by name (Den 2 before Den 10). The order goes down the list, then back up, and so on. You can rearrange it afterwards.</p>
+    <p class="muted small">Each <strong>run</strong> races every car in a den the chosen number of times, spread over the lanes. With one race per lane ({{ default_races }}), every car runs every lane once. Fewer races make a shorter run; if the cars don't fill the last heat, its empty lanes are skipped and the heat finishes once its cars have times. Dens go in pack order (Lion, Tiger, Wolf, …). The order goes down the list, then back up, and so on. You can rearrange it afterwards.</p>
     <form class="row" method="post" action="/admin/event/{{ event.id }}/schedule">
       <label>Runs per den <input name="passes" type="number" min="1" max="6" value="{{ default_passes }}" style="width:4.5em"></label>
       <label>Races per scout per run <input name="races" type="number" min="1" max="{{ max_races }}" value="{{ default_races }}" style="width:4.5em"></label>

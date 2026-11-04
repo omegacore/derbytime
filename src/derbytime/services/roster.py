@@ -7,7 +7,8 @@ Takes the pack's roster export as CSV or tab-separated text. Columns used
     Scout Last Name
     Member ID          stable key: re-imports match on it, so den moves and
                        name fixes update the scout instead of duplicating them
-    Den                each den gets its own runs
+    Den                each den gets its own runs; an ordering prefix such
+                       as "0 - Lion" is stripped and sets the den's place
     Status             if present, only rows marked "Active" race
 
 Every other column (parent contacts, DOB, dues, …) is ignored and never
@@ -28,6 +29,7 @@ from __future__ import annotations
 import csv
 import io
 import random
+import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 
@@ -68,10 +70,28 @@ def _clean(s: str) -> str:
     return " ".join(s.split())
 
 
-def get_or_create_group(session: Session, name: str, rank: str | None = None) -> Group:
+# the pack's roster export numbers its dens so they sort: "0 - Lion", "1 - Tiger"
+_DEN_PREFIX = re.compile(r"^(\d+)\s*[-–—.:)]\s*(?=\S)")
+
+
+def split_den(name: str) -> tuple[str, int | None]:
+    """``"0 - Lion"`` -> ``("Lion", 0)``. Dens are stored by the bare name
+    (re-imports must match them); the number only orders a new den. Names
+    without such a prefix are kept as they are."""
+    name = _clean(name)
+    m = _DEN_PREFIX.match(name)
+    return (name[m.end():], int(m.group(1))) if m else (name, None)
+
+
+def get_or_create_group(session: Session, name: str, rank: str | None = None, order: int | None = None) -> Group:
+    name, prefix = split_den(name)
+    order = prefix if order is None else order
     g = session.exec(select(Group).where(Group.name == name)).first()
     if not g:
-        order = session.exec(select(func.count()).select_from(Group)).one()
+        if order is None:
+            # no prefix: share the last place, so such dens sort by name
+            # among themselves (Den 2 before Den 10) whatever order they come in
+            order = session.exec(select(func.max(Group.sort_order))).one() or 0
         g = Group(name=name, rank=rank or None, sort_order=order)
         session.add(g)
         session.flush()
@@ -150,11 +170,12 @@ class RosterRow:
     line: int
     first: str
     last: str
-    den: str
+    den: str  # without the ordering prefix (``split_den``)
     member_id: str | None
     active: bool
     number: int | None
     car_name: str | None
+    den_order: int | None = None  # the prefix's number: orders a new den
     racer_id: int | None = None
     kind: str = "new"  # new | update | reactivate | deactivate | same | skip
     changes: list[str] = field(default_factory=list)
@@ -267,12 +288,14 @@ def _parse(text: str, columns: dict[str, str | None] | None = None) -> tuple[lis
             number = int(num) if num else None
         except ValueError:
             raise ServiceError(f"Line {lineno}: number {num!r} is not a whole number.")
+        den, den_order = split_den(norm.get("den", ""))
         rows.append(
             RosterRow(
                 line=lineno,
                 first=first,
                 last=_clean(norm.get("last_name", "")),
-                den=_clean(norm.get("den", "")) or "Unassigned",
+                den=den or "Unassigned",
+                den_order=den_order,
                 member_id=norm.get("member_id") or None,
                 # the roster export lists former scouts too; only Active ones race
                 active=not has_status or norm.get("status", "").casefold() == "active",
@@ -357,7 +380,7 @@ def apply_import(session: Session, event: Event, plan: ImportPlan, actor: Actor,
         if row.kind == "skip" and not row.changes:
             result.skipped_inactive += row.racer_id is None
             continue
-        group = get_or_create_group(session, row.den)
+        group = get_or_create_group(session, row.den, order=row.den_order)
         if row.racer_id is None:
             racer = Racer(first_name=row.first, last_name=row.last, group_id=group.id, member_id=row.member_id)
             session.add(racer)

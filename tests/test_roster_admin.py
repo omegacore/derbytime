@@ -14,12 +14,23 @@ from derbytime.services.roster import (
     merge_racers,
     plan_import,
     remove_entry,
+    split_den,
     set_entry_status,
     update_entry,
     update_racer,
 )
-from derbytime.services.schedule import create_final, eligible_entries, event_standings, pack_standings, regenerate
-from derbytime.services.setup import create_event
+from derbytime.routes import roster as roster_routes
+from derbytime.services.schedule import (
+    create_final,
+    eligible_entries,
+    event_standings,
+    generate_group_rounds,
+    group_key,
+    group_rounds,
+    pack_standings,
+    regenerate,
+)
+from derbytime.services.setup import add_track, create_event
 
 from test_services import ACTOR, demo, make_service, race_all, run, tracks_of  # noqa: F401
 from test_web import admin, app, client, join  # noqa: F401
@@ -49,18 +60,18 @@ def test_reimport_matches_member_id_and_syncs_changes(session, settings):
     text = HEADER + "Kyle,Smith,111,Active,1 - Tiger\nAmie,Jones,222,Inactive,1 - Tiger\nBo,Lee,444,Active,1 - Tiger\nOld,Kid,333,Inactive,1 - Tiger\n"
     plan = plan_import(session, ev, text)
     assert [r.kind for r in plan.rows] == ["update", "deactivate", "new", "skip"]
-    assert plan.rows[0].changes == ["den 0 - Lion → 1 - Tiger"]
+    assert plan.rows[0].changes == ["den Lion → Tiger"]
     assert "name Amy Jones → Amie Jones" in plan.rows[1].changes
     assert [r.name for r in plan.entering] == ["Bo Lee"]
     # nothing was written by planning
-    assert den_of(session, racers(session)["111"]) == "0 - Lion"
+    assert den_of(session, racers(session)["111"]) == "Lion"
 
     result = apply_import(session, ev, plan, ACTOR)
     session.commit()
     assert (result.imported, result.updated, result.deactivated, result.skipped_inactive) == (1, 1, 1, 1)
     rs = racers(session)
     assert len(rs) == 3  # no duplicates
-    assert den_of(session, rs["111"]) == "1 - Tiger"
+    assert den_of(session, rs["111"]) == "Tiger"
     assert rs["222"].first_name == "Amie" and not rs["222"].active
     # the same file again changes nothing
     assert not plan_import(session, ev, text).changed
@@ -143,6 +154,88 @@ def test_import_guesses_columns(session, settings):
     plan = plan_import(session, ev, HEADER + "Kyle,Smith,111,Active,Den 1\n")
     assert plan.columns == {"first_name": "Scout First Name", "last_name": "Scout Last Name", "member_id": "Member ID",
                             "den": "Den", "status": "Status", "number": None, "car_name": None}
+
+
+def test_split_den_strips_only_an_ordering_prefix():
+    assert split_den("0 - Lion") == ("Lion", 0)
+    assert split_den(" 5 -  AOL ") == ("AOL", 5)
+    assert split_den("3-Bear") == ("Bear", 3)
+    for bare in ("Lion", "Den 3", "Wolf Den 3", "2026 Graduates", "0 - "):
+        assert split_den(bare) == (" ".join(bare.split()), None)
+
+
+PACK_DENS = ["Lion", "Tiger", "Wolf", "Bear", "Webelos", "AOL", "Graduated"]
+
+
+def test_prefixed_den_matches_existing_bare_den(session, settings):
+    """The live dens were renamed to bare names; re-importing the roster
+    export ("0 - Lion") must reuse them, not bring the prefixed dens back."""
+    for i, name in enumerate(PACK_DENS):
+        session.add(Group(name=name, sort_order=i))
+    session.flush()
+    ev = create_event(session, settings, "Derby", EventType.derby, ACTOR)
+    text = HEADER + "Kyle,Smith,111,Active,0 - Lion\nAmy,Jones,222,Active,1 - Tiger\n"
+    plan = plan_import(session, ev, text)
+    assert [(r.den, r.den_order) for r in plan.rows] == [("Lion", 0), ("Tiger", 1)]
+    apply_import(session, ev, plan, ACTOR)
+    session.commit()
+    assert [g.name for g in session.exec(select(Group).order_by(Group.sort_order))] == PACK_DENS
+    rs = racers(session)
+    assert (den_of(session, rs["111"]), den_of(session, rs["222"])) == ("Lion", "Tiger")
+
+    # re-importing the same file changes nothing
+    assert [r.kind for r in plan_import(session, ev, text).rows] == ["same", "same"]
+
+
+def test_new_dens_take_their_place_from_the_prefix(session, settings):
+    ev = create_event(session, settings, "Derby", EventType.derby, ACTOR)
+    import_csv(session, ev, HEADER + "A,A,1,Active,3 - Bear\nB,B,2,Active,0 - Lion\nC,C,3,Active,Graduated\nD,D,4,Active,2 - Wolf\n", ACTOR)
+    session.commit()
+    order = {g.name: g.sort_order for g in session.exec(select(Group))}
+    # no prefix: shares the last place and sorts by name there
+    assert order == {"Bear": 3, "Lion": 0, "Graduated": 3, "Wolf": 2}
+    assert [g.name for g in sorted(session.exec(select(Group)), key=group_key)] == ["Lion", "Wolf", "Bear", "Graduated"]
+
+
+def add_pack_dens(s, first_order=0):
+    """The live dens: bare names, sort_order in pack order. Racers are added
+    in name order (AOL first) so a name sort would show."""
+    ev = create_event(s, s.info["settings"], "Derby", EventType.derby, ACTOR)
+    for i, name in enumerate(PACK_DENS):
+        s.add(Group(name=name, sort_order=first_order + i))
+    rows = "".join(f"{d}kid,Scout,{100 + i},Active,{d}\n" for i, d in enumerate(sorted(PACK_DENS)))
+    import_csv(s, ev, HEADER + rows, ACTOR, checked_in=True)
+    s.commit()
+    return ev
+
+
+def test_dens_run_and_rank_in_sort_order(session, settings):
+    session.info["settings"] = settings
+    ev = add_pack_dens(session)
+    assert [g.name for g in sorted(session.exec(select(Group)), key=group_key)] == PACK_DENS
+    add_track(session, settings, ev, "Main", ACTOR, lane_count=4)
+    generate_group_rounds(session, ev, ACTOR, passes=2)
+    session.commit()
+    assert [r.name for r in group_rounds(session, ev.id)][:7] == PACK_DENS
+    assert [b["name"] for b in event_standings(session, ev)][:7] == PACK_DENS
+
+
+def test_admin_pages_list_dens_in_sort_order(app, admin, settings):  # noqa: F811
+    with Session(app.state.engine) as s:
+        s.info["settings"] = settings
+        ev = add_pack_dens(s, first_order=2)  # after the seeded Bear Den 5, Wolf Den 3 (both 0)
+        assert roster_routes.den_names(s) == ["Bear Den 5", "Wolf Den 3", *PACK_DENS]
+        add_track(s, settings, ev, "Main", ACTOR, lane_count=4)
+        generate_group_rounds(s, ev, ACTOR, passes=1)
+        s.commit()
+        ev_id = ev.id
+    app.state.page_cache.bump()
+    page = admin.get("/admin/roster").text
+    at = [page.index(f"{d}kid Scout") for d in PACK_DENS]
+    assert at == sorted(at)
+    page = admin.get(f"/admin/event/{ev_id}").text
+    at = [page.index(f">{d}</option>") for d in PACK_DENS]
+    assert at == sorted(at)
 
 
 def test_inactive_scouts_are_not_scheduled(session, settings, demo):

@@ -38,6 +38,7 @@ from ..services.schedule import (
     create_final,
     create_runoff,
     den_entries,
+    den_key,
     den_name,
     event_standings,
     MAX_RACES,
@@ -53,7 +54,6 @@ from ..services.schedule import (
     set_race_order,
 )
 from ..services.setup import add_track, create_event
-from ..core.scheduler import natural_key
 from ..timers import REGISTRY
 from .deps import get_official, get_session, race, render, require
 
@@ -131,7 +131,7 @@ def admin_event(event_id: int, request: Request, s: Session = Depends(get_sessio
             "order": race_order(s, ev) if rounds else [],
             "problems": schedule_problems(s, ev) if rounds else {},
             "projection": projected_finish(s, ev, td.heat_seconds + td.heat_overhead_seconds) if rounds else None,
-            "dens": sorted(((gid, den_name(s, gid)) for gid in den_entries(s, ev.id)), key=lambda d: natural_key(d[1])),
+            "dens": [(gid, den_name(s, gid)) for gid in sorted(den_entries(s, ev.id), key=lambda gid: den_key(s, gid))],
             "default_passes": td.passes_per_den,
             "default_races": max((len(t.usable_lanes) for t in tracks if t.active), default=td.lane_count),
             "max_races": MAX_RACES,

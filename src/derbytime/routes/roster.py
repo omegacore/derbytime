@@ -14,7 +14,7 @@ from ..models import Entry, EntryStatus, Event, EventStatus, Group, Racer, Round
 from ..services import ServiceError
 from ..services import export, roster
 from ..services.race import RaceService
-from ..core.scheduler import natural_key
+from ..services.schedule import group_key
 from .admin import _reschedule, admin_only, back, form, get_event
 from .deps import get_official, get_session, race, render
 
@@ -48,7 +48,7 @@ def publish_entry(request: Request, entry: Entry) -> None:
 
 
 def den_names(s: Session) -> list[str]:
-    return sorted((g.name for g in s.exec(select(Group))), key=natural_key)
+    return [g.name for g in sorted(s.exec(select(Group)), key=group_key)]
 
 
 # --- pack roster ---------------------------------------------------------------
@@ -61,7 +61,7 @@ def roster_page(request: Request, s: Session = Depends(get_session), me=Depends(
     entries: dict[int, list] = {}
     for e, ev in s.exec(select(Entry, Event).join(Event, Event.id == Entry.event_id).order_by(Event.id)):
         entries.setdefault(e.racer_id, []).append((e, ev))
-    rows = sorted(racers, key=lambda rg: (not rg[0].active, natural_key(rg[1].name if rg[1] else "~"), rg[0].last_name, rg[0].first_name))
+    rows = sorted(racers, key=lambda rg: (not rg[0].active, group_key(rg[1]), rg[0].last_name, rg[0].first_name))
     return render(request, "admin/roster.html", {"rows": rows, "entries": entries, "dens": den_names(s)})
 
 

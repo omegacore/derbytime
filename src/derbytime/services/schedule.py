@@ -91,6 +91,16 @@ def den_name(session: Session, group_id: int | None) -> str:
     return g.name if g else NO_DEN
 
 
+def group_key(g: Group | None) -> tuple:
+    """Pack order for dens: ``Group.sort_order`` (Lion, Tiger, … Graduated),
+    then name; scouts without a den last."""
+    return (0, g.sort_order, scheduler.natural_key(g.name)) if g else (1,)
+
+
+def den_key(session: Session, group_id: int | None) -> tuple:
+    return group_key(session.get(Group, group_id) if group_id else None)
+
+
 def pass_name(den: str, n: int) -> str:
     return den if n == 1 else f"{den} · run {n}"
 
@@ -256,8 +266,8 @@ def _den_races(session: Session, event_id: int, group_id: int | None) -> int | N
 def generate_group_rounds(
     session: Session, event: Event, actor: Actor, passes: int | None = None, races: int | None = None
 ) -> list[Round]:
-    """Build every den's runs. Dens are sorted by name (numbers compared
-    numerically) and the race order snakes: down the list, back up, …
+    """Build every den's runs. Dens go in pack order (``group_key``) and
+    the race order snakes: down the list, back up, …
     Each run is spread over all of the event's active tracks and races each
     scout ``races`` times (default: once per lane)."""
     if session.exec(select(Round).where(Round.event_id == event.id)).first():
@@ -272,7 +282,7 @@ def generate_group_rounds(
         raise ServiceError("Runs per den must be between 1 and 6.")
     races = _check_races(races, tracks)
 
-    dens = sorted(by_group, key=lambda gid: scheduler.natural_key(den_name(session, gid)))
+    dens = sorted(by_group, key=lambda gid: den_key(session, gid))
     rounds = []
     count: dict[int | None, int] = defaultdict(int)
     for seq, gid in enumerate(scheduler.snake_order(dens, passes), start=1):
@@ -302,7 +312,7 @@ def regenerate(session: Session, event: Event, actor: Actor, reason: str = "") -
 
     runs = group_rounds(session, event.id)
     per_den = Counter(r.group_id for r in runs)
-    new_dens = sorted((g for g in den_map if g not in per_den), key=lambda g: scheduler.natural_key(den_name(session, g)))
+    new_dens = sorted((g for g in den_map if g not in per_den), key=lambda g: den_key(session, g))
     seq = max((r.seq for r in runs), default=0)
     for gid in new_dens:
         races = _den_races(session, event.id, gid)
@@ -761,12 +771,12 @@ def den_progress(session: Session, rnd: Round, with_runoffs: bool = True) -> tup
 
 
 def event_standings(session: Session, event: Event) -> list[dict[str, Any]]:
-    """One block per den (passes combined, in den-name order), then the final."""
+    """One block per den (passes combined, in pack den order), then the final."""
     out = []
     seen: set = set()
     groups = sorted(
         {r.group_id: r for r in reversed(group_rounds(session, event.id))}.values(),
-        key=lambda r: scheduler.natural_key(den_name(session, r.group_id)),
+        key=lambda r: den_key(session, r.group_id),
     )
     finals = session.exec(select(Round).where(Round.event_id == event.id, Round.kind == RoundKind.final).order_by(Round.seq)).all()
     dq = entries_with_status(session, event.id, EntryStatus.disqualified)
