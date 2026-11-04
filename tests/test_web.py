@@ -343,7 +343,7 @@ def test_regatta_flow_with_phones(app, admin):
 
     assert admin.post(f"/api/track/{g.id}/stage").status_code == 204
     heat = current_heat(app, g.id)
-    assert "#2" in admin.get(f"/partials/operate/{g.id}").text  # lane cards render
+    assert "#1" in admin.get(f"/partials/operate/{g.id}").text  # lane cards render
     info = lane1.get(f"/partials/lane/{g.id}/1").text
     assert 'data-armed="0"' in info and f'data-heat="{heat.id}"' in info
 

@@ -176,7 +176,7 @@ def test_roster_import(session, settings):
     csv = "First Name,Last Name,Den,Car Number,Car\nSam,Lee,Tiger Den 1,7,Zippy\nJo,Ray,Tiger Den 1,,\n,,,,\n"
     assert import_csv(session, ev, csv, ACTOR, checked_in=True).imported == 2
     entries = session.exec(select(Entry).where(Entry.event_id == ev.id).order_by(Entry.number)).all()
-    assert [e.number for e in entries] == [7, 8]
+    assert [e.number for e in entries] == [7, 10]  # Jo draws the first free pack number
     assert entries[0].name == "Zippy" and entries[0].checked_in
     with pytest.raises(ServiceError):
         import_csv(session, ev, "first_name,number\nAl,x\n", ACTOR)

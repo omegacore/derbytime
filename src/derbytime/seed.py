@@ -35,9 +35,9 @@ def seed_demo(session: Session, settings: Settings) -> tuple[Event, Event]:
     add_track(session, settings, regatta, "Gutter A", actor)
     add_track(session, settings, regatta, "Gutter B", actor)
 
-    for i, r in enumerate(racers):
+    for i, r in enumerate(racers):  # fixed numbers keep the demo (and tests) predictable
         add_entry(session, derby, r, 101 + i, CARS[i % 10], checked_in=True)
-        add_entry(session, regatta, r, 201 + i, BOATS[i % 10], checked_in=True)
+        add_entry(session, regatta, r, 101 + i, BOATS[i % 10], checked_in=True)
 
     generate_group_rounds(session, derby, actor, settings.type_defaults("derby").passes_per_den)
     generate_group_rounds(session, regatta, actor, settings.type_defaults("regatta").passes_per_den)

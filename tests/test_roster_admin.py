@@ -15,6 +15,7 @@ from derbytime.services.roster import (
     plan_import,
     remove_entry,
     set_entry_status,
+    update_entry,
     update_racer,
 )
 from derbytime.services.schedule import create_final, eligible_entries, event_standings, pack_standings, regenerate
@@ -77,7 +78,8 @@ def test_legacy_racers_without_member_id_get_one(session, settings):
     plan = plan_import(session, ev, HEADER + "Kyle,Smith,111,Active,Den 2\n")
     assert plan.rows[0].kind == "update"
     assert plan.rows[0].changes == ["den Den 1 → Den 2", "Member ID added"]
-    assert plan.not_in_file == ["#102 Sam Fox"]
+    sam = session.exec(select(Entry).join(Racer).where(Racer.first_name == "Sam")).one()
+    assert plan.not_in_file == [f"#{sam.number} Sam Fox"]
     apply_import(session, ev, plan, ACTOR)
     assert racers(session)["111"].first_name == "Kyle"
     assert len(racers(session)) == 2
@@ -88,6 +90,28 @@ def test_different_member_id_is_a_different_scout(session, settings):
     import_csv(session, ev, HEADER + "Sam,Lee,111,Active,Den 1\n", ACTOR)
     plan = plan_import(session, ev, HEADER + "Sam,Lee,999,Active,Den 1\n")
     assert plan.rows[0].kind == "new"
+
+
+def test_pack_numbers_random_from_10_and_kept_across_events(session, settings, monkeypatch):
+    monkeypatch.setattr("random.shuffle", lambda xs: xs.reverse())  # stand-in for a random order
+    derby = create_event(session, settings, "Derby", EventType.derby, ACTOR)
+    import_csv(session, derby, "first_name,den\nAl,Den 1\nBo,Den 1\nCy,Den 2\n", ACTOR)
+    nums = {r.first_name: r.number for r in session.exec(select(Racer))}
+    assert nums == {"Cy": 10, "Bo": 11, "Al": 12}
+    entries = {e.racer_id: e.number for e in session.exec(select(Entry).where(Entry.event_id == derby.id))}
+    assert sorted(entries.values()) == [10, 11, 12]
+
+    regatta = create_event(session, settings, "Regatta", EventType.regatta, ACTOR)
+    import_csv(session, regatta, "first_name,den\nAl,Den 1\nBo,Den 1\nCy,Den 2\nDee,Den 2\n", ACTOR)
+    got = {r.first_name: e.number for e, r in session.exec(select(Entry, Racer).join(Racer).where(Entry.event_id == regatta.id))}
+    assert got == {**nums, "Dee": 13}
+
+    al = session.exec(select(Entry).join(Racer).where(Entry.event_id == regatta.id, Racer.first_name == "Al")).one()
+    update_entry(session, al, ACTOR, 50, None)
+    assert session.get(Racer, al.racer_id).number == 50  # an edited number follows the racer
+    bo = session.exec(select(Entry).join(Racer).where(Entry.event_id == regatta.id, Racer.first_name == "Bo")).one()
+    with pytest.raises(ServiceError, match="already used"):
+        update_entry(session, bo, ACTOR, 10, None)  # Cy's number in this event
 
 
 def test_import_rejects_used_numbers(session, settings):

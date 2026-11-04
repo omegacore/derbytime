@@ -11,7 +11,8 @@ Takes the pack's roster export as CSV or tab-separated text. Columns used
     Status             if present, only rows marked "Active" race
 
 Every other column (parent contacts, DOB, dues, …) is ignored and never
-stored. Optional extras: ``number`` (car/boat number, otherwise assigned) and
+stored. Optional extras: ``number`` (car/boat number; otherwise the scout keeps
+their pack number, or draws a random free one from 10 up) and
 ``car_name``. Short headers like ``first_name`` also work.
 
 Importing is a sync: ``plan_import`` compares the file with the database and
@@ -23,6 +24,7 @@ from __future__ import annotations
 
 import csv
 import io
+import random
 from collections import defaultdict
 from dataclasses import dataclass, field
 
@@ -62,8 +64,35 @@ def get_or_create_group(session: Session, name: str, rank: str | None = None) ->
     return g
 
 
-def next_number(session: Session, event_id: int) -> int:
-    return (session.exec(select(func.max(Entry.number)).where(Entry.event_id == event_id)).one() or 100) + 1
+FIRST_NUMBER = 10
+
+
+def assign_numbers(session: Session, racers: list[Racer], event_id: int) -> None:
+    """Give racers without a pack number the lowest free ones, in random
+    order, so numbers say nothing about den or name. Free = no racer holds it
+    and no entry in this event uses it (an entry may override its number)."""
+    todo = [r for r in racers if r.number is None]
+    if not todo:
+        return
+    random.shuffle(todo)
+    taken = set(session.exec(select(Racer.number).where(col(Racer.number).is_not(None))))
+    taken |= set(session.exec(select(Entry.number).where(Entry.event_id == event_id)))
+    n = FIRST_NUMBER
+    for r in todo:
+        while n in taken:
+            n += 1
+        r.number = n
+        taken.add(n)
+        session.add(r)
+    session.flush()
+
+
+def _claim_number(session: Session, racer: Racer, number: int) -> None:
+    """An explicit number becomes the racer's pack number if they have none
+    and no other racer holds it."""
+    if racer.number is None and not session.exec(select(Racer).where(Racer.number == number)).first():
+        racer.number = number
+        session.add(racer)
 
 
 def add_entry(
@@ -78,9 +107,14 @@ def add_entry(
     if existing:
         return existing
     if number is None:
-        number = next_number(session, event.id)
+        assign_numbers(session, [racer], event.id)
+        number = racer.number
+        if session.exec(select(Entry).where(Entry.event_id == event.id, Entry.number == number)).first():
+            raise ServiceError(f"{racer.display_name}'s number {number} is already used in this event. Give them a number.")
     elif session.exec(select(Entry).where(Entry.event_id == event.id, Entry.number == number)).first():
         raise ServiceError(f"Number {number} is already used in this event.")
+    else:
+        _claim_number(session, racer, number)
     e = Entry(
         event_id=event.id,
         racer_id=racer.id,
@@ -266,6 +300,7 @@ def plan_import(session: Session, event: Event, text: str) -> ImportPlan:
 def apply_import(session: Session, event: Event, plan: ImportPlan, actor: Actor, checked_in: bool = False) -> ImportResult:
     now = utcnow()
     result = ImportResult(0)
+    to_enter: list[tuple[Racer, RosterRow]] = []
     for row in plan.rows:
         if row.kind == "skip" and not row.changes:
             result.skipped_inactive += row.racer_id is None
@@ -292,8 +327,16 @@ def apply_import(session: Session, event: Event, plan: ImportPlan, actor: Actor,
             if row.changes or row.kind in ("reactivate", "deactivate"):
                 audit(session, actor, "racer.sync", "racer", racer.id, before=before, after=racer_snapshot(session, racer))
         if row.enter:
-            add_entry(session, event, racer, row.number, row.car_name, checked_in)
-            result.imported += 1
+            to_enter.append((racer, row))
+    # numbers given in the file first, then the rest drawn at random around them
+    given = [rr for rr in to_enter if rr[1].number is not None]
+    drawn = [rr for rr in to_enter if rr[1].number is None]
+    for racer, row in given:
+        add_entry(session, event, racer, row.number, row.car_name, checked_in)
+    assign_numbers(session, [r for r, _ in drawn], event.id)
+    for racer, row in drawn:
+        add_entry(session, event, racer, None, row.car_name, checked_in)
+    result.imported += len(to_enter)
     audit(
         session, actor, "roster.import", "event", event.id,
         after={"rows": result.imported, "updated": result.updated, "deactivated": result.deactivated,
@@ -409,6 +452,12 @@ def update_entry(session: Session, entry: Entry, actor: Actor, number: int, car_
     ).first():
         raise ServiceError(f"Number {number} is already used in this event.")
     before = {"number": entry.number, "name": entry.name}
+    if number != entry.number:
+        # the new number follows the racer into later events, unless another racer holds it
+        racer = session.get(Racer, entry.racer_id)
+        if not session.exec(select(Racer).where(Racer.number == number, Racer.id != racer.id)).first():
+            racer.number = number
+            session.add(racer)
     entry.number, entry.name = number, (car_name or "").strip() or None
     session.add(entry)
     audit(session, actor, "entry.update", "entry", entry.id, before=before, after={"number": entry.number, "name": entry.name})

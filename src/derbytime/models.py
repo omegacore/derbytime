@@ -107,6 +107,8 @@ class Racer(SQLModel, table=True):
     member_id: Optional[str] = Field(default=None, index=True)
     # set when the roster stops listing the scout as Active; None = active
     inactive_since: Optional[datetime] = None
+    # pack-wide car/boat number, given on first entry and reused in every event
+    number: Optional[int] = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=utcnow)
 
     @property
