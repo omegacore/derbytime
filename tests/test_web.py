@@ -511,6 +511,36 @@ def test_checkin(app):
     assert c.post("/api/entry/1/checkin", data={"weight_oz": "heavy"}).status_code == 400
 
 
+def test_checkin_names_the_car(app, monkeypatch):
+    c = other_client(app)
+    join(app, c, Role.checkin)
+    published = []
+    real = app.state.bus.publish
+    monkeypatch.setattr(app.state.bus, "publish", lambda t, d=None, keys=None: published.append(keys) or real(t, d, keys))
+    r = c.post("/api/entry/1/checkin", data={"car_name": "  The   Blue\tBlur  ", "inspection_status": "passed"})
+    assert r.status_code == 200 and 'value="The Blue Blur"' in r.text
+    with Session(app.state.engine) as s:
+        e = s.get(Entry, 1)
+        assert e.name == "The Blue Blur"
+        racer_id, event_id = e.racer_id, e.event_id
+    assert "standings" in published[-1] and f"racer-{racer_id}" in published[-1]
+    # the name shows on the event standings, the board and the scout's page
+    for url in [f"/partials/event/{event_id}", f"/partials/standings?event={event_id}", f"/partials/racer/{racer_id}"]:
+        assert "The Blue Blur" in c.get(url).text, url
+
+    # saving check-in without changing the name doesn't wake the boards
+    c.post("/api/entry/1/checkin", data={"car_name": "The Blue Blur", "weight_oz": "5"})
+    assert "standings" not in published[-1]
+    # a form without the field (older page still open) leaves the name alone
+    c.post("/api/entry/1/checkin", data={"weight_oz": "5"})
+    c.post("/api/entry/1/checkin", data={"car_name": "x" * 60})
+    with Session(app.state.engine) as s:
+        assert s.get(Entry, 1).name == "x" * 40
+    c.post("/api/entry/1/checkin", data={"car_name": " "})
+    with Session(app.state.engine) as s:
+        assert s.get(Entry, 1).name is None
+
+
 JPEG = b"\xff\xd8\xff\xe0" + b"\0" * 64
 
 

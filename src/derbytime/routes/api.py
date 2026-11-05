@@ -13,6 +13,7 @@ from sqlmodel import Session, col, select
 from .. import auth
 from ..models import Entry, Event, Group, Heat, InspectionStatus, Official, Racer, Track
 from ..services import ServiceError, views
+from ..services.roster import clean_car_name
 from ..services.audit import audit
 from ..services.race import RaceService
 from .deps import get_official, get_session, public_cached, race, render, require
@@ -199,7 +200,10 @@ async def checkin(entry_id: int, request: Request, s: Session = Depends(get_sess
     if not entry:
         raise ServiceError("Entry not found", 404)
     f = await form(request)
-    before = {"checked_in": entry.checked_in, "weight_oz": entry.weight_oz, "inspection": entry.inspection_status.value}
+    before = {"checked_in": entry.checked_in, "weight_oz": entry.weight_oz, "inspection": entry.inspection_status.value, "name": entry.name}
+    renamed = "car_name" in f and clean_car_name(f["car_name"]) != entry.name
+    if renamed:
+        entry.name = clean_car_name(f["car_name"])
     entry.checked_in = f.get("checked_in") == "on"
     w = f.get("weight_oz", "").strip()
     try:
@@ -209,10 +213,13 @@ async def checkin(entry_id: int, request: Request, s: Session = Depends(get_sess
     entry.inspection_status = InspectionStatus(f.get("inspection_status", entry.inspection_status.value))
     entry.inspection_notes = f.get("inspection_notes", "").strip() or None
     s.add(entry)
-    after = {"checked_in": entry.checked_in, "weight_oz": entry.weight_oz, "inspection": entry.inspection_status.value}
+    after = {"checked_in": entry.checked_in, "weight_oz": entry.weight_oz, "inspection": entry.inspection_status.value, "name": entry.name}
     audit(s, auth.actor_for(me), "entry.checkin", "entry", entry.id, before=before, after=after)
     s.commit()
-    request.app.state.bus.publish("entry.updated", {"entry_id": entry.id, **after}, keys=["checkin", f"event-{entry.event_id}"])
+    keys = ["checkin", f"event-{entry.event_id}"]
+    if renamed:  # the board and the scout's own page show the name; wake them only when it changes
+        keys += ["standings", f"racer-{entry.racer_id}"]
+    request.app.state.bus.publish("entry.updated", {"entry_id": entry.id, **after}, keys=keys)
     racer = s.get(Racer, entry.racer_id)
     group = s.get(Group, racer.group_id) if racer.group_id else None
     ev = s.get(Event, entry.event_id)

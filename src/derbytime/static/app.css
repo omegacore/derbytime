@@ -144,8 +144,15 @@ body.kiosk main { max-width: none; padding: 2vw; }
 .lane-info { text-align: center; }
 .lane-info .racer { font-size: 1.6rem; font-weight: 700; }
 
+/* a scout's car/boat name after their name; its own line on phones */
+.car-name::before { content: "· "; }
+.ci-name { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+.ci-name input { flex: 1; min-width: 0; }
+
 @media (max-width: 600px) {
   .hide-sm { display: none; }
+  .car-name { display: block; font-style: italic; }
+  .car-name::before { content: none; }
   th, td { padding: 6px 4px; }
 }
 
@@ -246,6 +253,7 @@ body.board main { max-width: none; padding: 0; }
 .slide td strong { color: var(--hi); }
 .slide .muted { color: var(--muted); }
 .slide .small { font-size: .6em; }
+.slide .car-name { font-size: .75em; font-style: italic; }
 .slide .flag { color: var(--hi); }
 .slide .rank {
   display: inline-grid; place-items: center; min-width: 1.8em; height: 1.8em; border-radius: 999px;

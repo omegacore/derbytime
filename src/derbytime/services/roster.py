@@ -121,6 +121,16 @@ def assign_numbers(session: Session, racers: list[Racer], event_id: int) -> None
     session.flush()
 
 
+CAR_NAME_MAX = 40
+
+
+def clean_car_name(name: str | None) -> str | None:
+    """A scout's name for their car/boat, tidied for the standings: inner
+    whitespace collapsed and capped so a long name can't break the board."""
+    name = " ".join((name or "").split())
+    return name[:CAR_NAME_MAX].rstrip() or None
+
+
 def _claim_number(session: Session, racer: Racer, number: int) -> None:
     """An explicit number becomes the racer's pack number if they have none
     and no other racer holds it."""
@@ -153,7 +163,7 @@ def add_entry(
         event_id=event.id,
         racer_id=racer.id,
         number=number,
-        name=name or None,
+        name=clean_car_name(name),
         checked_in=checked_in,
         inspection_status=InspectionStatus.passed if checked_in else InspectionStatus.pending,
     )
@@ -533,7 +543,7 @@ def update_entry(session: Session, entry: Entry, actor: Actor, number: int, car_
         if not session.exec(select(Racer).where(Racer.number == number, Racer.id != racer.id)).first():
             racer.number = number
             session.add(racer)
-    entry.number, entry.name = number, (car_name or "").strip() or None
+    entry.number, entry.name = number, clean_car_name(car_name)
     session.add(entry)
     audit(session, actor, "entry.update", "entry", entry.id, before=before, after={"number": entry.number, "name": entry.name})
 
