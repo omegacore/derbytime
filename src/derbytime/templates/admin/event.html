@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ event.name }} · admin{% endblock %}
 {% block content %}
-<p class="small"><a href="/admin">← Admin</a> · <a href="/event/{{ event.id }}">public page</a> · <a href="/display/standings?event={{ event.id }}">standings display</a> · <a href="/admin/roster">pack roster</a></p>
+<p class="small"><a href="/admin">← Admin</a> · <a href="/event/{{ event.id }}">public page</a> · <a href="/display/standings?event={{ event.id }}">standings display</a> · <a href="/admin/roster">pack roster</a> · <a href="/vote/results?event={{ event.id }}">scouts' choice votes</a></p>
 <p class="small">Export CSV: <a href="/admin/event/{{ event.id }}/export/roster.csv">entries</a> · <a href="/admin/event/{{ event.id }}/export/standings.csv">standings</a> · <a href="/admin/event/{{ event.id }}/export/heats.csv">every heat</a></p>
 <h1>{{ event.name }}</h1>
 

@@ -42,6 +42,7 @@ header.top nav a.mine { background: var(--role, var(--accent)); color: var(--rol
 .role-track_operator { --role: #1f5fbf; --role-ink: #fff; }
 .role-lane_official { --role: #1e7a3c; --role-ink: #fff; }
 .role-checkin { --role: #0f7a7a; --role-ink: #fff; }
+.role-vote_official { --role: #a3336b; --role-ink: #fff; }
 .role-bar { background: var(--role); color: var(--role-ink); }
 .role-bar .bar { padding-top: 6px; padding-bottom: 6px; gap: 6px 16px; }
 .role-bar a { color: inherit; }
@@ -328,3 +329,31 @@ body.board main { max-width: none; padding: 0; }
 .ci-photo.has .ci-photo-del { display: block; }
 .vehicle-photo { display: block; width: 100%; max-width: 420px; max-height: 300px; object-fit: cover; border-radius: 10px; margin: 8px 0; }
 .kiosk-who img { height: 6vw; width: 8vw; object-fit: cover; border-radius: .8vw; vertical-align: middle; margin-right: 1.5vw; }
+
+/* vote tablet */
+.vote-tabs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.vote-tabs a { padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); text-decoration: none; font-weight: 600; }
+.vote-tabs a[aria-current] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.vote-tabs a.small { border: 0; background: none; margin-left: auto; font-weight: 400; }
+.vote-filter { width: 100%; margin-bottom: 10px; }
+#vote-ballot-card { scroll-margin-top: 90px; }
+.vote-voters { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; max-height: 46vh; overflow-y: auto; }
+.vote-ballot { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+.vote-voter, .vote-car { position: relative; display: flex; flex-direction: column; gap: 2px; border: 2px solid var(--line); border-radius: 12px; background: var(--bg); padding: 10px 12px; cursor: pointer; touch-action: manipulation; }
+.vote-voter input, .vote-car input { position: absolute; opacity: 0; pointer-events: none; }
+.vote-voter[hidden], .vote-car[hidden] { display: none; }
+.vote-voter-name { font-weight: 700; }
+.vote-voter.voted { border-style: dashed; }
+.vote-voter:has(input:checked), .vote-car:has(input:checked) { border-color: var(--accent); background: var(--info-bg); box-shadow: 0 0 0 2px var(--accent); }
+.vote-car { align-items: center; text-align: center; padding: 8px; }
+.vote-car img, .vote-car-blank { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; background: var(--line); }
+.vote-car-blank { display: grid; place-items: center; font-size: 2.2rem; }
+.vote-num { font-size: 1.6rem; font-weight: 800; line-height: 1.1; }
+.vote-car-name { font-weight: 600; }
+.vote-car.own { opacity: .35; cursor: not-allowed; }
+.vote-confirm { position: sticky; bottom: 0; z-index: 5; display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 12px; box-shadow: 0 -4px 16px rgba(0,0,0,.12); }
+.vote-confirm button { min-width: 10em; font-size: 1.1rem; }
+.vote-done { font-size: 1.1rem; }
+.vote-recent { list-style: none; margin: 0; padding: 0; }
+.vote-recent li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.vote-thumb { width: 56px; height: 42px; object-fit: cover; border-radius: 6px; display: block; }

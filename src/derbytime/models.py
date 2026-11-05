@@ -75,6 +75,7 @@ class Role(str, Enum):
     track_operator = "track_operator"
     lane_official = "lane_official"
     checkin = "checkin"
+    vote_official = "vote_official"
 
 
 class Event(SQLModel, table=True):
@@ -248,6 +249,32 @@ class JoinToken(SQLModel, table=True):
     max_uses: int = 1
     uses: int = 0
     revoked: bool = False
+    created_at: datetime = Field(default_factory=utcnow)
+
+
+class VoteCategory(SQLModel, table=True):
+    """A scouts' choice award in one event, e.g. "Best Design" or "Most Creative"."""
+
+    __table_args__ = (UniqueConstraint("event_id", "name"),)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    event_id: int = Field(foreign_key="event.id", index=True)
+    name: str
+    sort_order: int = 0
+    # closed categories keep their votes but take no new ones
+    open: bool = True
+    created_at: datetime = Field(default_factory=utcnow)
+
+
+class Vote(SQLModel, table=True):
+    """One scout's vote in a category, recorded by a vote official. A scout
+    votes once per category; changing a vote replaces it."""
+
+    __table_args__ = (UniqueConstraint("category_id", "voter_racer_id"),)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    category_id: int = Field(foreign_key="votecategory.id", index=True)
+    voter_racer_id: int = Field(foreign_key="racer.id", index=True)
+    entry_id: int = Field(foreign_key="entry.id", index=True)
+    official_id: Optional[int] = Field(default=None, foreign_key="official.id")
     created_at: datetime = Field(default_factory=utcnow)
 
 

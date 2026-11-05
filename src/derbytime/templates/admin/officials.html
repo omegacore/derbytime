@@ -35,7 +35,7 @@
       <label>Uses <input name="max_uses" type="number" min="1" value="1" style="width:4.5em"></label>
       <button class="primary" type="submit">Create</button>
     </div>
-    <p class="small muted">Every official except an admin works one event, shown on their phone. Lane officials need a track and lane (or tick “one code per lane”). Track operators without a track can run any of their event's tracks. Finished events aren't listed. Codes expire after a few minutes.</p>
+    <p class="small muted">Every official except an admin works one event, shown on their phone. Lane officials need a track and lane (or tick “one code per lane”). Track operators without a track can run any of their event's tracks. A vote official records scouts' choice votes on a tablet. Finished events aren't listed. Codes expire after a few minutes.</p>
     {% if not open_events %}<p class="msg err">No events are in setup or active. Create or reopen one on the <a href="/admin">admin page</a> first.</p>{% endif %}
   </form>
 </section>
@@ -53,10 +53,11 @@
     lane.disabled = !n;
   }
   function sync() {
-    const admin = role.value === 'admin';
+    const admin = role.value === 'admin', noTrack = admin || role.value === 'vote_official';
     document.getElementById('event-field').hidden = admin;
-    document.getElementById('track-field').hidden = admin;
-    ev.disabled = track.disabled = admin;
+    document.getElementById('track-field').hidden = noTrack;
+    ev.disabled = admin;
+    track.disabled = noTrack;
     // only this event's tracks; clear a track left over from another event
     for (const g of track.querySelectorAll('optgroup')) g.hidden = g.disabled = g.dataset.event !== ev.value;
     if (track.selectedOptions[0]?.parentElement.disabled) track.value = '';

@@ -467,6 +467,8 @@ async def admin_create_token(request: Request, s: Session = Depends(get_session)
             event_id = ev.id
         else:
             track_id = lane = None  # admins run every event
+        if role == Role.vote_official:
+            track_id = lane = None  # votes are event-wide
         if lane is not None:
             t = s.get(Track, track_id) if track_id else None
             if t is None:

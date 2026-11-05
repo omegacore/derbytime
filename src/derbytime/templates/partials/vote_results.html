@@ -1,0 +1,41 @@
+{% if not results %}<p class="muted">No vote categories yet. Add one below.</p>{% endif %}
+{% for res in results %}{% set c = res.cat %}
+<section class="card">
+  <div class="row spread">
+    <h2>{{ c.name }} {% if c.open %}<span class="badge ok">open</span>{% else %}<span class="badge">closed</span>{% endif %}</h2>
+    <div class="row">
+      <span class="muted small">{{ res.rows | sum(attribute='votes') }} vote{{ '' if (res.rows | sum(attribute='votes')) == 1 else 's' }}</span>
+      <form method="post" action="/vote/category/{{ c.id }}">
+        <input type="hidden" name="action" value="{{ 'close' if c.open else 'open' }}">
+        <button class="small" type="submit">{{ 'Close voting' if c.open else 'Reopen voting' }}</button>
+      </form>
+      {% if me and me.role.value == 'admin' %}
+      <form method="post" action="/vote/category/{{ c.id }}" onsubmit="return confirm('Delete {{ c.name }} and all its votes?')">
+        <input type="hidden" name="action" value="delete">
+        <button class="small bad" type="submit">Delete</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% if res.rows %}
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th class="num">Place</th><th></th><th class="num">#</th><th>Vehicle</th><th>Scout</th><th class="hide-sm">Den</th><th class="num">Votes</th></tr></thead>
+    <tbody>
+    {% for row in res.rows %}{% set photo = vehicle_photo(row.entry) %}
+      <tr>
+        <td class="num"><strong>{{ row.place }}</strong>{% if row.tied %} <span class="flag small">tie</span>{% endif %}</td>
+        <td>{% if photo %}<img class="vote-thumb" src="{{ photo }}" alt="" loading="lazy">{% endif %}</td>
+        <td class="num">{{ row.entry.number }}</td>
+        <td>{{ row.entry.name or '' }}{% if row.out %} <span class="badge bad" title="No longer on the ballot">out</span>{% endif %}</td>
+        <td>{{ row.racer.display_name }}</td>
+        <td class="small hide-sm">{{ row.group.name if row.group else '' }}</td>
+        <td class="num"><strong>{{ row.votes }}</strong></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}<p class="muted small">No votes yet.</p>{% endif %}
+</section>
+{% endfor %}

@@ -1,0 +1,59 @@
+{% set label = "boat" if event.type.value == "regatta" else "car" %}
+{% if just %}<div class="msg ok vote-done">{{ "Changed" if changed else "Recorded" }}: <strong>{{ just.voter.display_name }}</strong> → #{{ just.entry.number }}{% if just.entry.name %} {{ just.entry.name }}{% endif %} for {{ cat.name }}.</div>{% endif %}
+{% if undone %}<div class="msg ok">Vote removed.</div>{% endif %}
+{% if not cat.open %}
+<p class="msg err">Voting for {{ cat.name }} is closed. Reopen it on the <a href="/vote/results?event={{ event.id }}">results page</a>.</p>
+{% elif not ballot %}
+<p class="msg err">No {{ label }}s are checked in yet, so there's nothing to vote for.</p>
+{% else %}
+<form id="vote-form" hx-post="/vote/cast" hx-target="#vote-panel" hx-swap="innerHTML" autocomplete="off">
+  <input type="hidden" name="category_id" value="{{ cat.id }}">
+  <input type="hidden" name="replace" value="">
+  <section class="card">
+    <div class="row spread"><h2>1. Who's voting?</h2><span class="muted small">{{ voted }} voted in {{ cat.name }}</span></div>
+    <input type="search" class="vote-filter" data-for="vote-voters" placeholder="Type the scout's name" enterkeyhint="search">
+    <div id="vote-voters" class="vote-voters">
+      {% for v in voters %}
+      <label class="vote-voter{% if v.vote %} voted{% endif %}" data-q="{{ v.racer.display_name | lower }} {{ (v.group.name if v.group else '') | lower }}"
+             data-name="{{ v.racer.display_name }}" data-voted="{{ v.voted_number or '' }}">
+        <input type="radio" name="voter" value="{{ v.racer.id }}">
+        <span class="vote-voter-name">{{ v.racer.display_name }}</span>
+        <span class="small muted">{{ v.group.name if v.group else '' }}{% if v.vote %} · ✓ voted #{{ v.voted_number }}{% endif %}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </section>
+  <section class="card" id="vote-ballot-card">
+    <h2>2. Which {{ label }}?</h2>
+    <input type="search" class="vote-filter" data-for="vote-ballot" placeholder="Number or {{ label }} name" enterkeyhint="search">
+    <div id="vote-ballot" class="vote-ballot">
+      {% for b in ballot %}{% set photo = vehicle_photo(b.entry) %}
+      <label class="vote-car" data-q="{{ b.entry.number }} {{ (b.entry.name or '') | lower }} {{ b.racer.display_name | lower }}"
+             data-number="{{ b.entry.number }}" data-name="{{ b.entry.name or '' }}" data-owner="{{ b.racer.id }}">
+        <input type="radio" name="entry" value="{{ b.entry.id }}">
+        {% if photo %}<img src="{{ photo }}" alt="" loading="lazy">{% else %}<span class="vote-car-blank" aria-hidden="true">{{ "⛵" if label == "boat" else "🏎️" }}</span>{% endif %}
+        <span class="vote-num">#{{ b.entry.number }}</span>
+        {% if b.entry.name %}<span class="vote-car-name">{{ b.entry.name }}</span>{% endif %}
+        <span class="small muted">{{ b.racer.display_name }}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </section>
+  <div class="vote-confirm">
+    <span id="vote-summary">Pick a scout, then a {{ label }}.</span>
+    <button class="primary" type="submit" id="vote-submit" disabled>Record vote</button>
+  </div>
+</form>
+{% endif %}
+{% if recent %}
+<section class="card">
+  <h2>Just recorded</h2>
+  <ul class="vote-recent">
+    {% for r in recent %}
+    <li><span><strong>{{ r.voter.display_name }}</strong> → #{{ r.entry.number }}{% if r.entry.name %} {{ r.entry.name }}{% endif %}</span>
+      <button class="small" hx-post="/vote/{{ r.vote.id }}/delete" hx-target="#vote-panel" hx-swap="innerHTML"
+              hx-confirm="Remove {{ r.voter.display_name }}'s vote?">Undo</button></li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}

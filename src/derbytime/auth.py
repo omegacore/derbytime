@@ -26,6 +26,7 @@ ROLE_LABELS = {
     Role.track_operator: "Track operator",
     Role.lane_official: "Lane official",
     Role.checkin: "Check-in",
+    Role.vote_official: "Vote official",
 }
 
 
@@ -159,6 +160,11 @@ def can_checkin(o: Official | None) -> bool:
     return bool(o and o.role in (Role.admin, Role.checkin))
 
 
+def can_vote(o: Official | None) -> bool:
+    """Record scouts' votes for vehicles and see the tallies."""
+    return bool(o and o.role in (Role.admin, Role.vote_official))
+
+
 def home_for(o: Official) -> str:
     if o.role == Role.admin:
         return "/admin"
@@ -170,6 +176,8 @@ def home_for(o: Official) -> str:
         return f"/track/{o.track_id}/lane/{o.lane}"
     if o.role == Role.checkin:
         return "/checkin"
+    if o.role == Role.vote_official:
+        return "/vote"
     return "/"
 
 
@@ -179,6 +187,7 @@ ROLE_HINTS = {
     Role.track_operator: "Stage and arm heats.",
     Role.lane_official: "Time your lane with the stopwatch.",
     Role.checkin: "Check in, weigh and inspect entries.",
+    Role.vote_official: "Record each scout's vote for a vehicle.",
 }
 
 
@@ -187,9 +196,11 @@ def nav_for(o: Official | None) -> list[tuple[str, str]]:
     if o is None:
         return [("/display/standings", "Standings")]
     links = [(home_for(o), {Role.admin: "Admin", Role.head_timekeeper: "Timekeeper", Role.track_operator: "Operate",
-                             Role.lane_official: "My lane", Role.checkin: "Check-in"}[o.role])]
+                             Role.lane_official: "My lane", Role.checkin: "Check-in", Role.vote_official: "Votes"}[o.role])]
     if o.role == Role.admin:
-        links += [("/admin/officials", "Officials"), ("/operate", "Operate"), ("/timekeeper", "Timekeeper"), ("/checkin", "Check-in")]
+        links += [("/admin/officials", "Officials"), ("/operate", "Operate"), ("/timekeeper", "Timekeeper"), ("/checkin", "Check-in"), ("/vote", "Votes")]
+    elif o.role == Role.vote_official:
+        links += [("/vote/results", "Results")]
     elif o.role == Role.head_timekeeper:
         links += [("/operate", "Operate")]
     links += [("/", "Schedule"), ("/display/standings", "Standings")]
