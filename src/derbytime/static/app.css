@@ -129,49 +129,60 @@ body.kiosk main { max-width: none; padding: 2vw; }
 .kiosk table { font-size: 2.2vw; }
 
 /* on-deck board: scouts read their name and where to go from across the room.
+   Everything is sized in em of .od, where 1em is a scout's name on deck, so
+   display_ondeck.html can shrink the whole board to fit and names stay biggest.
    Each track keeps one colour (tc0..tc5) everywhere it appears. */
 .tc0 { --tc: #1f5fbf; } .tc1 { --tc: #c2410c; } .tc2 { --tc: #15803d; }
 .tc3 { --tc: #7e22ce; } .tc4 { --tc: #be185d; } .tc5 { --tc: #0e7490; }
 body.ondeck main { padding: 1.2vw 2vw; }
-.od { display: grid; gap: 1vw; }
-.od-title { font-size: clamp(1.4rem, 3vw, 3.4rem); font-weight: 900; letter-spacing: .08em; margin: .2em 0 0; }
-.od-hole-title { font-size: clamp(1.1rem, 2vw, 2.2rem); color: var(--muted); }
-.od-empty { font-size: clamp(1.2rem, 3vw, 3rem); color: var(--muted); margin: 0; }
-.od-foot { color: var(--muted); font-size: clamp(.9rem, 1.2vw, 1.4rem); margin: 0; }
-.od-tracks { display: grid; gap: 1vw; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); }
-.od-track { border: .35vw solid var(--tc); border-radius: 1.2vw; background: var(--panel); overflow: hidden; }
-.od-track-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; background: var(--tc); color: #fff;
-  padding: .4vw 1.2vw; font-weight: 800; font-size: clamp(1.1rem, 2.2vw, 2.6rem); }
+.od { display: grid; gap: .25em; font-size: clamp(1.1rem, 3.4vw, 4.4rem); line-height: 1.15; }
+.od-title { font-size: .62em; font-weight: 900; letter-spacing: .08em; margin: .2em 0 0; }
+.od-hole-title { font-size: .45em; color: var(--muted); }
+.od-empty { font-size: .6em; color: var(--muted); margin: 0; }
+.od-foot { color: var(--muted); font-size: .3em; margin: 0; }
+.od-tracks { display: grid; gap: .25em; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11em), 1fr)); font-size: .5em; }
+.od-track { border: .12em solid var(--tc); border-radius: .4em; background: var(--panel); overflow: hidden; }
+.od-track-head { display: flex; justify-content: space-between; align-items: center; gap: 1em; background: var(--tc); color: #fff;
+  padding: .15em .5em; font-weight: 800; }
 .od-state { font-size: .7em; letter-spacing: .08em; }
-.od-now { display: flex; flex-wrap: wrap; gap: .4em 1.2em; padding: .6vw 1.2vw; font-size: clamp(1rem, 1.8vw, 2.2rem); font-weight: 600; }
+.od-now { display: flex; flex-wrap: wrap; gap: .2em 1em; padding: .25em .5em; font-size: .8em; font-weight: 600; }
 .od-now b, .od-hole-names b { display: inline-block; min-width: 1.6em; margin-right: .35em; text-align: center; border-radius: .3em;
   background: var(--bg); border: 1px solid var(--line); }
-.od-deck { --cols: 1; display: grid; gap: 1.5vw; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); }
-.od-heat { background: var(--panel); border-radius: 1.4vw; overflow: hidden; border: 1px solid var(--line); }
-.od-where { background: var(--tc); color: #fff; font-weight: 900; letter-spacing: .04em; padding: .6vw 1.4vw;
-  font-size: clamp(1.3rem, calc(4.5vw / var(--cols)), 3.6rem); display: flex; flex-wrap: wrap; gap: .3em .8em; align-items: center; }
-.od-where.od-any { background: var(--ink); color: var(--bg); }
-.od-chips { display: inline-flex; flex-wrap: wrap; gap: .3em; font-size: .6em; letter-spacing: 0; }
+/* one column: a row per scout, name on the left, arrow, then track + lane */
+.od-deck { display: grid; gap: .25em; }
+.od-heat { background: var(--panel); border-radius: .3em; border: 1px solid var(--line); padding: .15em .5em .2em; }
+.od-meta { color: var(--muted); font-size: .4em; }
+.od-wait { display: inline-block; margin-left: .5em; padding: 0 .5em; border-radius: .3em; background: var(--warn-bg); color: var(--warn); font-weight: 700; }
+.od-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, auto); align-items: center; gap: .5em;
+  padding: .06em 0; border-top: 1px solid var(--line); }
+.od-meta + .od-row { border-top: 0; }
+.od-who { min-width: 0; }
+.od-name { font-weight: 800; overflow-wrap: anywhere; margin-right: .4em; }
+.od-sub { color: var(--muted); font-size: .4em; white-space: nowrap; }
+.od-arrow { color: var(--tc, var(--ink)); font-size: 1.1em; line-height: 1; }
+.od-dest { display: flex; align-items: center; gap: .35em; justify-self: end; background: var(--tc); color: #fff; border-radius: .3em;
+  padding: .06em .08em .06em .45em; font-weight: 800; }
+.od-dest.od-any { background: var(--ink); color: var(--bg); }
+.od-dest-track { font-size: .62em; display: flex; flex-wrap: wrap; align-items: center; gap: .1em .5em; }
+.od-dest-lane { display: flex; align-items: baseline; gap: .2em; line-height: 1.05; padding: 0 .25em; border-radius: .22em;
+  background: var(--panel); color: var(--ink); font-weight: 900; }
+.od-dest-lane small { font-size: .42em; letter-spacing: .08em; font-weight: 800; }
+.od-chips { display: inline-flex; flex-wrap: wrap; gap: .3em; font-size: .75em; }
 .od-chip { display: inline-block; background: var(--tc, var(--ink)); color: #fff; border-radius: 999px; padding: .1em .7em; font-weight: 800;
   border: 2px solid rgba(255,255,255,.7); }
 .od-chip.od-any { background: var(--ink); color: var(--bg); }
-.od-meta { color: var(--muted); padding: .4vw 1.4vw 0; font-size: clamp(.9rem, calc(2vw / var(--cols) + .4vw), 1.8rem); }
-.od-wait { display: inline-block; margin-left: .5em; padding: 0 .5em; border-radius: .3em; background: var(--warn-bg); color: var(--warn); font-weight: 700; }
-.od-lanes { list-style: none; margin: 0; padding: .6vw 1.4vw 1.2vw; display: grid; gap: .8vw; }
-.od-lanes li { display: grid; grid-template-columns: auto 1fr; column-gap: 1.2vw; align-items: center; }
-.od-lane { grid-row: span 2; display: grid; place-items: center; line-height: 1; min-width: 2.1em; padding: .12em .2em .18em; border-radius: .25em;
-  background: var(--ink); color: var(--bg); font-weight: 900; font-size: clamp(2rem, calc(6vw / var(--cols)), 6rem); }
-.od-lane small { font-size: .26em; letter-spacing: .12em; font-weight: 700; margin-bottom: .2em; }
-.od-name { font-weight: 800; line-height: 1.05; overflow-wrap: anywhere; font-size: clamp(1.5rem, calc(7vw / var(--cols)), 6rem); }
-.od-sub { color: var(--muted); font-size: clamp(1rem, calc(3vw / var(--cols)), 2.2rem); align-self: start; }
-.od-hole { display: grid; gap: .5vw; }
-.od-hole-row { display: flex; flex-wrap: wrap; align-items: center; gap: .4em 1em; font-size: clamp(1rem, 1.9vw, 2.2rem); font-weight: 600;
-  background: var(--panel); border-radius: .8vw; padding: .5vw 1.2vw; }
+.od-hole { display: grid; gap: .15em; font-size: .42em; }
+.od-hole-row { display: flex; flex-wrap: wrap; align-items: center; gap: .3em 1em; font-weight: 600;
+  background: var(--panel); border-radius: .4em; padding: .2em .5em; }
 .od-hole-row .od-chip { font-size: .8em; border: 0; }
 .od-hole-names { display: flex; flex-wrap: wrap; gap: .3em 1.2em; }
 @media (max-width: 760px) {
-  .od-deck { grid-template-columns: 1fr; --cols: 1 !important; }
-  .od-name { font-size: 1.8rem; } .od-lane { font-size: 2.4rem; } .od-where { font-size: 1.4rem; }
+  .od { font-size: 1.6rem; }
+  .od-tracks, .od-hole { font-size: .6em; }
+  .od-dest-track { font-size: .5em; }
+  .od-row { grid-template-columns: auto minmax(0, 1fr); row-gap: .1em; }
+  .od-who { grid-column: 1 / -1; }
+  .od-dest { justify-self: start; }
 }
 
 /* stopwatch */

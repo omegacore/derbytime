@@ -1,13 +1,4 @@
-{# On-deck board: names first, and every heat says which track and lane. #}
-{% macro where(h) -%}
-  {%- if h.any_track -%}
-    <div class="od-where od-any">NEXT FREE TRACK
-      <span class="od-chips">{% for t in h.go_to %}<span class="od-chip tc{{ t.colour }}">{{ t.name }}</span>{% endfor %}</span>
-    </div>
-  {%- else -%}
-    <div class="od-where tc{{ h.go_to[0].colour }}">GO TO {{ h.go_to[0].name }}</div>
-  {%- endif -%}
-{%- endmacro %}
+{# On-deck board: one row per scout, name first, an arrow to their track and lane. #}
 
 <div class="od">
   <div class="od-tracks">
@@ -33,22 +24,27 @@
 
   <h1 class="od-title">ON DECK</h1>
   {% if board.on_deck %}
-  <div class="od-deck" style="--cols: {{ board.on_deck | length }}">
+  <div class="od-deck">
     {% for h in board.on_deck %}
-    <article class="od-heat">
-      {{ where(h) }}
+    <section class="od-heat">
       <div class="od-meta">{{ h.round_name }} · heat {{ h.number }}{% if h.is_rerun %} · re-run{% endif %}
         {% if h.waiting %}<span class="od-wait">waiting for a scout who is racing now</span>{% endif %}</div>
-      <ol class="od-lanes">
-        {% for l in h.lanes if not l.bye %}
-        <li>
-          <span class="od-lane"><small>LANE</small>{{ l.lane }}</span>
+      {% for l in h.lanes if not l.bye %}
+      <div class="od-row">
+        <div class="od-who">
           <span class="od-name">{{ l.racer_name }}</span>
           <span class="od-sub">#{{ l.number }}{% if l.car_name %} · {{ l.car_name }}{% endif %}{% if l.group %} · {{ l.group }}{% endif %}</span>
-        </li>
-        {% endfor %}
-      </ol>
-    </article>
+        </div>
+        <span class="od-arrow {% if not h.any_track %}tc{{ h.go_to[0].colour }}{% endif %}" aria-hidden="true">➜</span>
+        <div class="od-dest {% if h.any_track %}od-any{% else %}tc{{ h.go_to[0].colour }}{% endif %}">
+          <span class="od-dest-track">{% if h.any_track %}Next free track
+            <span class="od-chips">{% for t in h.go_to %}<span class="od-chip tc{{ t.colour }}">{{ t.name }}</span>{% endfor %}</span>
+            {% else %}{{ h.go_to[0].name }}{% endif %}</span>
+          <span class="od-dest-lane"><small>LANE</small>{{ l.lane }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </section>
     {% endfor %}
   </div>
   {% else %}

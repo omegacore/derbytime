@@ -5,3 +5,25 @@
 <div data-live="{% if track %}track-{{ track.id }}{% else %}track{% endif %}" data-jitter="300"
      hx-get="/partials/ondeck{% if track %}/{{ track.id }}{% endif %}" hx-trigger="load, rm-load, every 30s"></div>
 {% endblock %}
+{% block scripts %}
+<script>
+// A TV can't scroll: shrink the on-deck names until the whole board fits.
+// Phones (narrow screens) just scroll.
+(function () {
+  function fit() {
+    const deck = document.querySelector(".od");
+    if (!deck) return;
+    deck.style.fontSize = "";
+    if (innerWidth < 760) return;
+    const page = document.documentElement;
+    let size = parseFloat(getComputedStyle(deck).fontSize);
+    while (page.scrollHeight > innerHeight && size > 16) {
+      size *= 0.94;
+      deck.style.fontSize = size + "px";
+    }
+  }
+  document.addEventListener("htmx:afterSettle", fit);
+  addEventListener("resize", fit);
+})();
+</script>
+{% endblock %}
