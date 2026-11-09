@@ -14,11 +14,13 @@
   tools/deploy.ps1 -Branch shared-heat-queue
   tools/deploy.ps1 -Branch shared-heat-queue -LoadTest -Port 8000
   tools/deploy.ps1 -RestartOnly
+  tools/deploy.ps1 -RestartOnly -ListenHost 127.0.0.1   # public Wi-Fi: this laptop only
   tools/deploy.ps1 -Branch x -DryRun
 #>
 param(
     [string]$Branch,
     [int]$Port = 8000,
+    [string]$ListenHost,    # default: whatever the running server listens on, else 0.0.0.0
     [switch]$LoadTest,      # also run tools/loadtest.py on a copy of the DB
     [switch]$NoRestart,     # merge + test only
     [switch]$RestartOnly,   # skip merge/test, just restart between heats
@@ -127,8 +129,13 @@ if ($active) {
 }
 
 $server = Get-ServerRoot $Port
+if (-not $ListenHost) {
+    # Keep the running server's binding, so a restart never quietly turns a
+    # localhost-only server (public Wi-Fi) back into one the whole network sees.
+    $ListenHost = if ($server -and $server.CommandLine -match '--host\s+(\S+)') { $Matches[1] } else { '0.0.0.0' }
+}
 if ($DryRun) {
-    Step ("dry run: would restart " + $(if ($server) { "PID $($server.ProcessId): $($server.CommandLine)" } else { "(nothing listening on $Port; would start one)" }))
+    Step ("dry run: would restart " + $(if ($server) { "PID $($server.ProcessId): $($server.CommandLine)" } else { "(nothing listening on $Port; would start one)" }) + " on $ListenHost")
     exit 0
 }
 if ($server) {
@@ -139,8 +146,8 @@ if ($server) {
 
 New-Item -ItemType Directory -Force (Join-Path $root 'logs') | Out-Null
 $log = Join-Path $root "logs/server-$Port"
-Step "starting server on port $Port (logs/server-$Port.out.log)"
-Start-Process -FilePath $exe -ArgumentList 'serve', '--host', '0.0.0.0', '--port', $Port `
+Step "starting server on ${ListenHost}:$Port (logs/server-$Port.out.log)"
+Start-Process -FilePath $exe -ArgumentList 'serve', '--host', $ListenHost, '--port', $Port `
     -WorkingDirectory $root -WindowStyle Hidden `
     -RedirectStandardOutput "$log.out.log" -RedirectStandardError "$log.err.log" | Out-Null
 if (-not (Wait-Server $Port)) { Fail "server did not come back on port $Port; see logs/server-$Port.err.log" }
