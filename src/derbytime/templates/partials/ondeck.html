@@ -1,26 +1,70 @@
-{% set cur = st.current %}
-{% set show = cur or st.last %}
-<p class="kiosk-title">{{ st.track.name }}</p>
-{% if show %}
-  <p class="kiosk-sub">
-    {% if cur %}{% if cur.status == 'armed' %}RACING{% else %}STAGED{% endif %}{% else %}LAST HEAT{% endif %}
-    · {{ show.round_name }} heat {{ show.number }}{% if show.is_rerun %} (re-run){% endif %}
-    {% if not cur and show.status == 'pending' %}· results pending{% endif %}
-  </p>
-  <div class="kiosk-lanes">
-  {% for l in show.lanes %}
-    <div class="kiosk-lane">
-      <div class="lane-no">{{ l.lane }}</div>
-      <div class="kiosk-who">{% if l.bye %}<span class="bye">—</span>{% else %}{% if l.photo_url %}<img src="{{ l.photo_url }}" alt="">{% endif %}<strong>#{{ l.number }}</strong> {{ l.racer_name }}{% endif %}</div>
-      <div class="time">{% if not cur and show.status == 'approved' and l.has_result %}{{ l.final_time | t(l.dnf) }}{% if l.place %} <span class="muted">P{{ l.place }}</span>{% endif %}{% endif %}</div>
+{# On-deck board: names first, and every heat says which track and lane. #}
+{% macro where(h) -%}
+  {%- if h.any_track -%}
+    <div class="od-where od-any">NEXT FREE TRACK
+      <span class="od-chips">{% for t in h.go_to %}<span class="od-chip tc{{ t.colour }}">{{ t.name }}</span>{% endfor %}</span>
     </div>
+  {%- else -%}
+    <div class="od-where tc{{ h.go_to[0].colour }}">GO TO {{ h.go_to[0].name }}</div>
+  {%- endif -%}
+{%- endmacro %}
+
+<div class="od">
+  <div class="od-tracks">
+  {% for t in board.tracks %}
+    {% set cur = t.current %}
+    <section class="od-track tc{{ t.colour }}">
+      <div class="od-track-head">
+        <span class="od-track-name">{{ t.name }}</span>
+        <span class="od-state">{% if not cur %}OPEN{% elif cur.status == 'armed' %}RACING{% else %}STAGED{% endif %}</span>
+      </div>
+      {% if cur %}
+        <div class="od-now">
+          {% for l in cur.lanes if not l.bye %}<span><b>{{ l.lane }}</b>{{ l.racer_name }}</span>{% endfor %}
+        </div>
+      {% else %}
+        <div class="od-now muted">{% if t.remaining %}Waiting for the next heat{% else %}No more heats{% endif %}</div>
+      {% endif %}
+    </section>
+  {% else %}
+    <p class="od-empty">No active tracks.</p>
   {% endfor %}
   </div>
-{% else %}
-  <p class="kiosk-sub">Waiting for the first heat</p>
-{% endif %}
-{% for h in st.upcoming %}
-  <p class="kiosk-next"><strong>{% if loop.first %}ON DECK{% else %}IN THE HOLE{% endif %}</strong> · {{ h.round_name }} heat {{ h.number }}:
-  {% for l in h.lanes if not l.bye %}<span style="margin-right:1.5vw">L{{ l.lane }} #{{ l.number }} {{ l.racer_name }}</span>{% endfor %}</p>
-{% endfor %}
-{% if not st.upcoming and not cur %}<p class="kiosk-next muted">No more heats queued.</p>{% endif %}
+
+  <h1 class="od-title">ON DECK</h1>
+  {% if board.on_deck %}
+  <div class="od-deck" style="--cols: {{ board.on_deck | length }}">
+    {% for h in board.on_deck %}
+    <article class="od-heat">
+      {{ where(h) }}
+      <div class="od-meta">{{ h.round_name }} · heat {{ h.number }}{% if h.is_rerun %} · re-run{% endif %}
+        {% if h.waiting %}<span class="od-wait">waiting for a scout who is racing now</span>{% endif %}</div>
+      <ol class="od-lanes">
+        {% for l in h.lanes if not l.bye %}
+        <li>
+          <span class="od-lane"><small>LANE</small>{{ l.lane }}</span>
+          <span class="od-name">{{ l.racer_name }}</span>
+          <span class="od-sub">#{{ l.number }}{% if l.car_name %} · {{ l.car_name }}{% endif %}{% if l.group %} · {{ l.group }}{% endif %}</span>
+        </li>
+        {% endfor %}
+      </ol>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+    <p class="od-empty">No more heats queued.</p>
+  {% endif %}
+
+  {% if board.in_hole %}
+  <h2 class="od-title od-hole-title">IN THE HOLE</h2>
+  <div class="od-hole">
+    {% for h in board.in_hole %}
+    <div class="od-hole-row">
+      {% if h.any_track %}<span class="od-chip od-any">Next free track</span>{% else %}<span class="od-chip tc{{ h.go_to[0].colour }}">{{ h.go_to[0].name }}</span>{% endif %}
+      <span class="od-hole-names">{% for l in h.lanes if not l.bye %}<span><b>{{ l.lane }}</b>{{ l.racer_name }}</span>{% endfor %}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <p class="od-foot">{{ board.remaining }} heat{{ '' if board.remaining == 1 else 's' }} left in line</p>
+</div>

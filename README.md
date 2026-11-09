@@ -28,7 +28,7 @@ One laptop (or a Raspberry Pi) runs the server. Phones on the same Wi-Fi are the
 **Officials and families**
 - Officials join by scanning a short-lived QR code for their role: admin, head timekeeper, track operator, lane official (one code per lane) or check-in. No accounts or passwords. Any device can be revoked.
 - Families need no login: search for a scout, see the schedule and results live, and **☆ Follow** racers for "2 heats away", "on deck", "racing now" and "results posted" alerts.
-- Projector/TV displays for each track's on-deck list and the standings board.
+- Projector/TV displays: an on-deck screen for all tracks (or one) and the standings board.
 
 **Records and reliability**
 - Every change is in the audit log.
@@ -47,7 +47,7 @@ The roles, and the page each one keeps open:
 | Lane officials (regatta), one per lane | phone | `/track/{id}/lane/{n}`: big START/STOP button |
 | Head timekeeper | phone or tablet | `/timekeeper`: approve, edit or re-run |
 | Families | their own phones | `/`: search, follow, live results |
-| Projector or TV | any browser | `/display/ondeck/{track}`, `/display/standings` |
+| Projector or TV | any browser | `/display/ondeck` (all tracks), `/display/ondeck/{track}`, `/display/standings` |
 
 **Before the day**
 1. Install and start the server (see [Quick start](#quick-start-laptop)), and open the one-time admin link on the race director's laptop.
@@ -274,7 +274,7 @@ Every change is in the audit log.
   - *every heat*: every lane of every heat, re-runs included, with raw and final times, places, edit reasons and timestamps.
 - `/admin/roster.csv` exports the whole pack roster.
 
-Displays for a projector or TV: `/display/ondeck/{track}` and `/display/standings` (add `?event=ID` to limit it to one event). Families use `/`: search, schedule and results, and **☆ Follow**. Follows are stored on the phone. Alerts fire at "2 heats away", "on deck", "racing now" and "results posted" as an in-page banner with a beep and vibration (sound needs one tap on the page first, a browser rule).
+Displays for a projector or TV: `/display/ondeck` (every active track on one screen: each upcoming heat says which track to go to, or "next free track" with the candidates, and a big lane number by each name), `/display/ondeck/{track}` (the same for one track) and `/display/standings` (add `?event=ID` to limit it to one event). Families use `/`: search, schedule and results, and **☆ Follow**. Follows are stored on the phone. Alerts fire at "2 heats away", "on deck", "racing now" and "results posted" as an in-page banner with a beep and vibration (sound needs one tap on the page first, a browser rule).
 
 ### Scoring modes
 

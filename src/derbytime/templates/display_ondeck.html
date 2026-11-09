@@ -1,5 +1,7 @@
 {% extends "base.html" %}
-{% block title %}{{ track.name }}: on deck{% endblock %}
+{% block title %}{% if track %}{{ track.name }}: on deck{% else %}On deck{% endif %}{% endblock %}
+{% block body_class %}ondeck{% endblock %}
 {% block content %}
-<div data-live="track-{{ track.id }}" hx-get="/partials/ondeck/{{ track.id }}" hx-trigger="load, rm-load"></div>
+<div data-live="{% if track %}track-{{ track.id }}{% else %}track{% endif %}" data-jitter="300"
+     hx-get="/partials/ondeck{% if track %}/{{ track.id }}{% endif %}" hx-trigger="load, rm-load, every 30s"></div>
 {% endblock %}

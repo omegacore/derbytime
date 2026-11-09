@@ -56,13 +56,14 @@ def other_client(app):
 
 def test_public_pages_render(client, app):
     t = track(app, "derby")
-    for url in ["/", "/partials/home", "/display/standings", "/partials/standings", f"/display/ondeck/{t.id}",
+    for url in ["/", "/partials/home", "/display/standings", "/partials/standings", "/display/ondeck", "/partials/ondeck", f"/display/ondeck/{t.id}",
                 f"/partials/ondeck/{t.id}", "/event/1", "/partials/event/1", "/racer/1", "/partials/racer/1",
                 "/partials/search?q=liam", "/partials/search?q=101", "/me", "/healthz"]:
         r = client.get(url)
         assert r.status_code == 200, (url, r.text[:300])
     assert "Liam" in client.get("/partials/search?q=liam").text
     assert "Main Track" in client.get("/partials/home").text
+    assert "ON DECK" in client.get("/partials/ondeck").text and "LANE" in client.get(f"/partials/ondeck/{t.id}").text
     assert client.get("/static/vendor/htmx.min.js").status_code == 200
 
 
@@ -742,3 +743,15 @@ def test_officials_bypass_public_cache(app, client):
     join(app, client, Role.admin)
     client.get("/partials/home")
     assert "/partials/home?" not in app.state.page_cache._entries
+
+
+def test_ondeck_board_gives_each_track_one_next_heat(app):
+    """Demo: the derby has one track, the regatta two gutters sharing a queue."""
+    from derbytime.services import views
+
+    with Session(app.state.engine) as s:
+        board = views.ondeck_board(s)
+    used = [t["name"] for h in board["on_deck"] if not h["any_track"] for t in h["go_to"]]
+    assert used == ["Main Track"]  # the derby's single track takes only one heat next
+    shared = [h for h in board["on_deck"] if h["any_track"]]
+    assert len(shared) == 2 and all({t["name"] for t in h["go_to"]} == {"Gutter A", "Gutter B"} for h in shared)

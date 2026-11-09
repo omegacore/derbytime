@@ -207,3 +207,43 @@ def test_follow_alerts_use_the_shared_queue(settings, session):
     # both tracks would take heat 1 next, so it's on deck once, then heat 2
     assert [(kind, hv["id"]) for kind, hv in up] == [("on_deck", queue[0]), ("two_away", queue[1])]
     assert {hv["track_name"] for _, hv in up} == {"Next free track"}
+
+
+def test_ondeck_board_merges_the_shared_queue(settings, session):
+    ev, (a, b) = two_track_event(session, settings)
+    queue = [h.id for h, _ in views.scheduled_heats(session, [a, b])]
+    board = views.ondeck_board(session)
+    # one heat on deck per track, the next ones in the hole, no repeats
+    assert [h["id"] for h in board["on_deck"]] == queue[:2]
+    assert [h["id"] for h in board["in_hole"]] == queue[2:4]
+    assert board["remaining"] == len(queue)
+    for h in board["on_deck"]:
+        assert h["any_track"] and [t["id"] for t in h["go_to"]] == [a.id, b.id]
+    assert [t["current"] for t in board["tracks"]] == [None, None]
+
+    # staging the front heat on A shows it at A and moves the line up
+    front = session.get(Heat, queue[0])
+    front.status, front.track_id = HeatStatus.staged, a.id
+    session.add(front)
+    session.commit()
+    board = views.ondeck_board(session)
+    assert board["tracks"][0]["current"]["id"] == front.id
+    assert board["tracks"][1]["current"] is None
+    assert front.id not in [h["id"] for h in board["on_deck"] + board["in_hole"]]
+    rbh = views.racers_by_heat(session, queue)
+    for h in board["on_deck"]:
+        assert h["waiting"] == bool(rbh[h["id"]] & rbh[front.id])
+
+
+def test_ondeck_board_for_one_track_names_it(settings, session):
+    ev, (a, b) = two_track_event(session, settings)
+    board = views.ondeck_board(session, b.id)
+    assert [t["id"] for t in board["tracks"]] == [b.id]
+    (h,) = board["on_deck"]
+    assert not h["any_track"] and h["go_to"][0]["name"] == b.name
+    # with a single active track, the heat simply goes there
+    a.active = False
+    session.add(a)
+    session.commit()
+    (h,) = views.ondeck_board(session)["on_deck"]
+    assert not h["any_track"] and h["go_to"][0]["id"] == b.id

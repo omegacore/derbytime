@@ -100,5 +100,5 @@
   {{ lanes_list(st.last) }}
 </section>
 {% endif %}
-<p class="small"><a href="/display/ondeck/{{ tid }}" target="_blank">Open on-deck display</a>
+<p class="small"><a href="/display/ondeck/{{ tid }}" target="_blank">Open on-deck display</a> · <a href="/display/ondeck" target="_blank">all tracks</a>
 {% if st.timer.human %}· Lane pages: {% for n in range(1, st.track.lane_count + 1) %}<a href="/track/{{ tid }}/lane/{{ n }}">lane {{ n }}</a> {% endfor %}{% endif %}</p>

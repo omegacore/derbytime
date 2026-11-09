@@ -260,6 +260,74 @@ def plan_all(session: Session, limit: int | None = None) -> dict[int, list[Heat]
     return out
 
 
+def ondeck_board(session: Session, track_id: int | None = None) -> dict[str, Any]:
+    """The on-deck display: what each track is racing now, then the next
+    heats in line, each marked with where its scouts should go.
+
+    Every track of an event lists the same shared queue, so the heats are
+    merged into one line (ordered by how soon any track would take them) and
+    each one names the tracks that could race it. ``on_deck`` holds the next
+    heat for each track (a track only takes one next); ``in_hole`` the round
+    after that.
+    """
+    tracks = active_tracks(session)
+    colour = {t.id: i % 6 for i, t in enumerate(tracks)}  # same on every screen
+    if track_id is not None:
+        tracks = [t for t in tracks if t.id == track_id]
+    plan = {tid: q for tid, q in plan_all(session).items() if tid in {t.id for t in tracks}}
+    names = {t.id: t.name for t in tracks}
+    # Sort by the earliest place any track's queue holds the heat (then by
+    # track, for separate events racing side by side).
+    first: dict[int, tuple[int, int]] = {}
+    where: dict[int, list[int]] = defaultdict(list)
+    heats: dict[int, Heat] = {}
+    for ti, t in enumerate(tracks):
+        for pos, h in enumerate(plan.get(t.id, [])):
+            heats[h.id] = h
+            where[h.id].append(t.id)
+            first[h.id] = min(first.get(h.id, (pos, ti)), (pos, ti))
+    line = sorted(first, key=first.__getitem__)
+
+    def take(ids: list[int]) -> list[int]:
+        """The next heats in line, at most one per track (a shared heat
+        uses up one of the tracks that could race it)."""
+        free, out = {t.id for t in tracks}, []
+        for hid in ids:
+            tid = next((t for t in where[hid] if t in free), None)
+            if tid is not None:
+                free.discard(tid)
+                out.append(hid)
+            if not free:
+                break
+        return out
+
+    deck = take(line)
+    hole = take([hid for hid in line if hid not in deck])
+    racing = set().union(*on_track_racers(session).values())
+    rbh = racers_by_heat(session, deck + hole)
+    queued = heat_views(session, [heats[hid] for hid in deck + hole])
+    for hv in queued:
+        tids = where[hv["id"]]
+        hv["go_to"] = [{"id": tid, "name": names[tid], "colour": colour[tid]} for tid in tids]
+        hv["any_track"] = len(tids) > 1
+        hv["waiting"] = bool(rbh[hv["id"]] & racing)  # a scout in it is on a track now
+
+    current = {
+        h.track_id: h
+        for h in session.exec(select(Heat).where(col(Heat.status).in_(ON_TRACK), col(Heat.track_id).in_(list(names))))
+    }
+    cur_views = {hv["track_id"]: hv for hv in heat_views(session, list(current.values()))}
+    return {
+        "tracks": [
+            {"id": t.id, "name": t.name, "colour": colour[t.id], "current": cur_views.get(t.id), "remaining": len(plan.get(t.id, []))}
+            for t in tracks
+        ],
+        "on_deck": queued[: len(deck)],
+        "in_hole": queued[len(deck) :],
+        "remaining": len(line),
+    }
+
+
 def track_state(session: Session, track: Track, timer_status: dict | None = None, upcoming: int = 3) -> dict[str, Any]:
     current = session.exec(
         select(Heat).where(Heat.track_id == track.id, col(Heat.status).in_(ON_TRACK))

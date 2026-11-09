@@ -19,7 +19,7 @@
       <h3>{% if loop.first %}On deck{% else %}Next up{% endif %}: {{ heat_title(h) }}</h3>
       {{ lanes_list(h, results=False) }}
     {% endfor %}
-    <p class="small muted">{{ st.remaining }} heat(s) left · <a href="/display/ondeck/{{ st.track.id }}">on-deck screen</a></p>
+    <p class="small muted">{{ st.remaining }} heat(s) left · <a href="/display/ondeck/{{ st.track.id }}">on-deck screen</a> · <a href="/display/ondeck">all tracks</a></p>
   </section>
 {% endfor %}
 </div>

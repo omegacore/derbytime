@@ -152,17 +152,29 @@ def racer_partial(racer_id: int, request: Request, s: Session = Depends(get_sess
 # --- kiosk displays -------------------------------------------------------------
 
 
+@router.get("/display/ondeck")
+def ondeck_all(request: Request):
+    """Every active track on one screen: the one to put by the staging table."""
+    return render(request, "display_ondeck.html", {"track": None, "kiosk": True})
+
+
 @router.get("/display/ondeck/{track_id}")
 def ondeck(track_id: int, request: Request, s: Session = Depends(get_session)):
     t = get_track(s, track_id)
     return render(request, "display_ondeck.html", {"track": t, "kiosk": True})
 
 
+@router.get("/partials/ondeck")
+@public_cached
+def ondeck_all_partial(request: Request, s: Session = Depends(get_session)):
+    return render(request, "partials/ondeck.html", {"board": views.ondeck_board(s)})
+
+
 @router.get("/partials/ondeck/{track_id}")
 @public_cached
-def ondeck_partial(track_id: int, request: Request, s: Session = Depends(get_session), rs: RaceService = Depends(race)):
+def ondeck_partial(track_id: int, request: Request, s: Session = Depends(get_session)):
     t = get_track(s, track_id)
-    return render(request, "partials/ondeck.html", {"st": views.track_state(s, t, rs.timer_status(t.id), upcoming=2)})
+    return render(request, "partials/ondeck.html", {"board": views.ondeck_board(s, t.id)})
 
 
 # Board colours by rank; a den matches when its name contains the keyword.
