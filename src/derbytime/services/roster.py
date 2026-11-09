@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 
 from sqlmodel import Session, col, func, select
 
-from ..models import Entry, EntryStatus, Event, Group, Heat, HeatLane, HeatStatus, InspectionStatus, Racer, utcnow
+from ..models import Entry, EntryStatus, Event, EventType, Group, Heat, HeatLane, HeatStatus, InspectionStatus, Racer, utcnow
 from . import Actor, ServiceError
 from .audit import audit
 
@@ -190,6 +190,12 @@ class RosterRow:
     kind: str = "new"  # new | update | reactivate | deactivate | same | skip
     changes: list[str] = field(default_factory=list)
     enter: bool = False  # gets an entry in this event
+    # already entered: their entry's number and current car/boat name, and the
+    # name the file gives when it differs (a blank cell never clears one)
+    entry_id: int | None = None
+    entry_number: int | None = None
+    old_car_name: str | None = None
+    rename: str | None = None
 
     @property
     def name(self) -> str:
@@ -213,8 +219,12 @@ class ImportPlan:
         return [r for r in self.rows if r.enter]
 
     @property
+    def renaming(self) -> list[RosterRow]:
+        return [r for r in self.rows if r.rename]
+
+    @property
     def changed(self) -> bool:
-        return bool(self.entering or self.of("new", "update", "reactivate", "deactivate"))
+        return bool(self.entering or self.renaming or self.of("new", "update", "reactivate", "deactivate"))
 
 
 @dataclass
@@ -224,6 +234,8 @@ class ImportResult:
     updated: int = 0
     deactivated: int = 0
     reactivated: int = 0
+    renamed: int = 0
+    vehicle: str = "car"
 
     @property
     def message(self) -> str:
@@ -232,6 +244,8 @@ class ImportResult:
             msg += f" Updated {self.updated}."
         if self.reactivated:
             msg += f" {self.reactivated} active again."
+        if self.renamed:
+            msg += f" Set {self.renamed} {self.vehicle} name{'' if self.renamed == 1 else 's'}."
         if self.deactivated:
             msg += f" Marked {self.deactivated} inactive."
         if self.skipped_inactive:
@@ -327,16 +341,18 @@ def plan_import(session: Session, event: Event, text: str, columns: dict[str, st
     by_name: dict[tuple[str, str], list[Racer]] = defaultdict(list)
     for r in racers:
         by_name[(r.first_name.casefold(), r.last_name.casefold())].append(r)
-    entered = set(session.exec(select(Entry.racer_id).where(Entry.event_id == event.id)))
+    entries = {e.racer_id: e for e in session.exec(select(Entry).where(Entry.event_id == event.id))}
+    entered = set(entries)
     claimed: set[int] = set()
 
     def match(row: RosterRow) -> Racer | None:
         if row.member_id and row.member_id in by_mid:
             return by_mid[row.member_id]
         # without a Member ID match: same name, and not a different Member ID
+        # (a file with no Member IDs, like a den leader's boat sheet, still matches)
         same = [
             r for r in by_name[(row.first.casefold(), row.last.casefold())]
-            if r.id not in claimed and (not r.member_id or r.member_id == row.member_id)
+            if r.id not in claimed and (not r.member_id or not row.member_id or r.member_id == row.member_id)
         ]
         in_den = [r for r in same if groups.get(r.group_id) == row.den]
         if in_den:
@@ -367,6 +383,13 @@ def plan_import(session: Session, event: Event, text: str, columns: dict[str, st
         else:
             row.kind = "update" if row.changes else "same"
         row.enter = row.active and racer.id not in entered
+        entry = entries.get(racer.id)
+        if entry and row.active:
+            # a later file that adds car/boat names, matched by name when it has no Member ID
+            row.entry_id, row.entry_number, row.old_car_name = entry.id, entry.number, entry.name
+            name = clean_car_name(row.car_name)
+            if name and name != entry.name:
+                row.rename = name
 
     numbers = [r.number for r in rows if r.enter and r.number is not None]
     used = set(session.exec(select(Entry.number).where(Entry.event_id == event.id)))
@@ -421,6 +444,16 @@ def apply_import(session: Session, event: Event, plan: ImportPlan, actor: Actor,
     assign_numbers(session, [r for r, _ in drawn], event.id)
     for racer, row in drawn:
         add_entry(session, event, racer, None, row.car_name, checked_in)
+    result.vehicle = "boat" if event.type == EventType.regatta else "car"
+    for row in plan.renaming:
+        entry = session.get(Entry, row.entry_id)
+        if entry is None or entry.event_id != event.id:
+            continue
+        before = {"number": entry.number, "name": entry.name}
+        entry.name = row.rename
+        session.add(entry)
+        audit(session, actor, "entry.update", "entry", entry.id, before=before, after={"number": entry.number, "name": entry.name})
+        result.renamed += 1
     result.imported += len(to_enter)
     audit(
         session, actor, "roster.import", "event", event.id,

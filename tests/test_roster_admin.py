@@ -125,6 +125,48 @@ def test_pack_numbers_random_from_10_and_kept_across_events(session, settings, m
         update_entry(session, bo, ACTOR, 10, None)  # Cy's number in this event
 
 
+def test_reimport_without_member_ids_sets_boat_names(session, settings):
+    ev = create_event(session, settings, "Regatta", EventType.regatta, ACTOR)
+    import_csv(session, ev, HEADER + "Kyle,Smith,111,Active,Lions\nAmy,Jones,222,Active,Tigers\nBo,Lee,333,Active,Tigers\n", ACTOR)
+    session.commit()
+    nums = {e.racer_id: e.number for e in session.exec(select(Entry).where(Entry.event_id == ev.id))}
+    kyle, amy, bo = (racers(session)[m] for m in ("111", "222", "333"))
+    update_entry(session, session.exec(select(Entry).where(Entry.racer_id == bo.id)).one(), ACTOR, nums[bo.id], "Old Name")
+    session.commit()
+
+    # a later sheet with no Member ID column, but boat numbers and names; Amy's number is a typo
+    text = ("Scout First Name,Scout Last Name,Den,Boat Number,Boat Name\n"
+            f"kyle,smith,Lions,{nums[kyle.id]},  Sea   Dog \n"
+            f"Amy,Jones,Tigers,{nums[amy.id] + 100},Tugboat\n"
+            f"Bo,Lee,Tigers,{nums[bo.id]},\n")
+    plan = plan_import(session, ev, text)
+    assert plan.columns["car_name"] == "Boat Name" and plan.columns["member_id"] is None
+    assert [r.racer_id for r in plan.rows] == [kyle.id, amy.id, bo.id]
+    assert not plan.entering
+    assert [(r.name, r.rename) for r in plan.renaming] == [("kyle smith", "Sea Dog"), ("Amy Jones", "Tugboat")]
+    assert plan.changed
+
+    result = apply_import(session, ev, plan, ACTOR)
+    session.commit()
+    names = {e.racer_id: e.name for e in session.exec(select(Entry).where(Entry.event_id == ev.id))}
+    # a blank cell keeps Bo's name; numbers never change on import
+    assert names == {kyle.id: "Sea Dog", amy.id: "Tugboat", bo.id: "Old Name"}
+    assert {e.racer_id: e.number for e in session.exec(select(Entry).where(Entry.event_id == ev.id))} == nums
+    assert result.renamed == 2 and "Set 2 boat names." in result.message
+    # the same file again changes nothing
+    assert not plan_import(session, ev, text).changed
+
+
+def test_import_preview_lists_boat_names(app, admin):  # noqa: F811
+    with Session(app.state.engine) as s:
+        ev = s.exec(select(Event).where(Event.type == EventType.regatta)).first()
+        e, r = s.exec(select(Entry, Racer).join(Racer, Racer.id == Entry.racer_id).where(Entry.event_id == ev.id)).first()
+        g = s.get(Group, r.group_id)
+    text = f"First Name,Last Name,Den,Boat Number,Boat Name\n{r.first_name},{r.last_name},{g.name},{e.number + 500},Paddle Pop\n"
+    page = admin.post(f"/admin/event/{ev.id}/import", data={"csv_text": text}).text
+    assert "Boat names" in page and "Paddle Pop" in page and f"file #{e.number + 500}" in page
+
+
 def test_import_rejects_used_numbers(session, settings):
     ev = create_event(session, settings, "Derby", EventType.derby, ACTOR)
     import_csv(session, ev, "first_name,number\nAl,7\n", ACTOR)

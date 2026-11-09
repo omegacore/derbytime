@@ -6,7 +6,7 @@
   <tbody>{% for r in rows %}
     <tr><td>{{ r.line }}</td><td>{{ r.name }}</td><td>{{ r.den }}</td>
       {% if show_changes %}<td>{{ r.changes | join('; ') }}</td>{% endif %}
-      <td>{% if r.enter %}new entry{% if r.number %} #{{ r.number }}{% endif %}{% endif %}</td></tr>
+      <td>{% if r.enter %}new entry{% if r.number %} #{{ r.number }}{% endif %}{% if r.car_name %} · {{ r.car_name }}{% endif %}{% endif %}</td></tr>
   {% endfor %}</tbody>
 </table></div>
 {% endmacro %}
@@ -51,6 +51,7 @@
      <strong>{{ new | length }}</strong> new scouts ·
      <strong>{{ upd | length }}</strong> updated ·
      <strong>{{ react | length }}</strong> active again ·
+     {% if plan.renaming %}<strong>{{ plan.renaming | length }}</strong> {{ vehicle }} names ·{% endif %}
      <strong>{{ deact | length }}</strong> now inactive ·
      {{ same | length }} unchanged ·
      {{ skip | length }} not Active (skipped)</p>
@@ -74,6 +75,20 @@
   <h2>Now inactive</h2>
   <p class="small muted">These scouts stop being scheduled in every event (their results so far stay). Regenerate the schedule of an event in progress afterwards.</p>
   {{ rows_table(deact, true) }}
+</section>
+{% endif %}
+{% if plan.renaming %}
+<section class="card">
+  <h2>{{ vehicle | capitalize }} names</h2>
+  <p class="small muted">Scouts already in {{ event.name }}, matched by Member ID or by name. Check the numbers: a mismatch can mean the wrong scout matched. A blank cell keeps the current name.</p>
+  <div class="table-wrap"><table class="small">
+    <thead><tr><th>Line</th><th>Scout</th><th class="num">#</th><th>Name</th></tr></thead>
+    <tbody>{% for r in plan.renaming %}
+      <tr><td>{{ r.line }}</td><td>{{ r.name }}</td>
+        <td class="num">{{ r.entry_number }}{% if r.number is not none and r.number != r.entry_number %} <span class="badge bad" title="the file gives #{{ r.number }}">file #{{ r.number }}</span>{% endif %}</td>
+        <td>{% if r.old_car_name %}<span class="muted">{{ r.old_car_name }} →</span> {% endif %}<strong>{{ r.rename }}</strong></td></tr>
+    {% endfor %}</tbody>
+  </table></div>
 </section>
 {% endif %}
 {% set entering_existing = plan.entering | rejectattr('kind', 'equalto', 'new') | list %}

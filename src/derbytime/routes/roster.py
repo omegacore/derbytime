@@ -258,7 +258,8 @@ async def admin_import(event_id: int, request: Request, s: Session = Depends(get
     # the preview's column pickers post col_<field>; the first upload has none, so guess
     columns = {k: f.get(f"col_{k}") or None for k in roster.FIELDS} if f.get("columns") else None
     url = f"/admin/event/{ev.id}"
-    ctx = {"event": ev, "text": text, "checked_in": checked_in, "fields": roster.FIELDS, "samples": roster.sample_values(text)}
+    ctx = {"event": ev, "text": text, "checked_in": checked_in, "fields": roster.FIELDS, "samples": roster.sample_values(text),
+           "vehicle": "boat" if ev.type.value == "regatta" else "car"}
     try:
         plan = roster.plan_import(s, ev, text, columns)
         if not f.get("apply"):
