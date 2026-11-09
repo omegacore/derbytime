@@ -250,6 +250,9 @@ class JoinToken(SQLModel, table=True):
     uses: int = 0
     revoked: bool = False
     created_at: datetime = Field(default_factory=utcnow)
+    # printed codes: never expire, any number of uses, until revoked or the
+    # event is finished. Nullable so older databases gain the column on start.
+    evergreen: Optional[bool] = False
 
 
 class VoteCategory(SQLModel, table=True):

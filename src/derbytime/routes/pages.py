@@ -351,9 +351,9 @@ def join_page(token: str, request: Request, s: Session = Depends(get_session), m
     from ..models import JoinToken
 
     jt = s.exec(select(JoinToken).where(JoinToken.token == token)).first()
-    problem = auth.token_problem(jt)
     track = s.get(Track, jt.track_id) if jt and jt.track_id else None
     event = s.get(Event, jt.event_id) if jt and jt.event_id else None
+    problem = auth.token_problem(jt, event)
     return render(request, "join.html", {"jt": jt, "problem": problem, "track": track, "event": event, "token": token}, 410 if problem else 200)
 
 

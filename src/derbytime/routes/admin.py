@@ -415,24 +415,22 @@ def admin_officials(request: Request, s: Session = Depends(get_session), me=Depe
     tokens = s.exec(
         select(JoinToken).where(JoinToken.revoked == False, JoinToken.expires_at > now).order_by(col(JoinToken.id).desc())  # noqa: E712
     ).all()
-    tokens = [t for t in tokens if t.uses < t.max_uses]
+    tokens = [t for t in tokens if not t.evergreen and t.uses < t.max_uses]
     base = auth.base_url(request.app.state.settings, request)
     tracks = {t.id: t for t in s.exec(select(Track).order_by(Track.id))}
     events = {e.id: e for e in s.exec(select(Event).order_by(Event.id))}
     # finished events can't take new officials, and their tracks drop out of the picker
     open_events = [e for e in events.values() if e.status != EventStatus.done]
     open_events.sort(key=lambda e: e.status != EventStatus.active)  # active first: the default choice
-    codes = []
-    for t in tokens:
-        url = f"{base}/join/{t.token}"
-        svg = segno.make(url, error="m").svg_inline(scale=5, border=2, dark="#000", light="#fff")
-        codes.append({"t": t, "url": url, "svg": svg, "track": tracks.get(t.track_id), "event": events.get(t.event_id)})
+    codes = [_code_view(t, base, tracks, events) for t in tokens]
+    printable = [_code_view(t, base, tracks, events, svg=False) for t in _evergreen_tokens(s)]
     officials = s.exec(select(Official).where(Official.revoked == False).order_by(Official.event_id, Official.role, Official.id)).all()  # noqa: E712
     return render(
         request,
         "admin/officials.html",
         {
             "codes": codes,
+            "printable": printable,
             "officials": officials,
             "tracks": tracks,
             "events": events,
@@ -442,6 +440,48 @@ def admin_officials(request: Request, s: Session = Depends(get_session), me=Depe
             "now": now,
         },
     )
+
+
+def _evergreen_tokens(s: Session, event_id: int | None = None) -> list[JoinToken]:
+    """Live printable codes in sheet order: event, role, track, lane."""
+    q = select(JoinToken).where(JoinToken.evergreen == True, JoinToken.revoked == False)  # noqa: E712
+    if event_id is not None:
+        q = q.where(JoinToken.event_id == event_id)
+    order = {r: i for i, r in enumerate(Role)}
+    toks = s.exec(q).all()
+    return sorted(toks, key=lambda t: (t.event_id or 0, order[t.role], t.track_id or 0, t.lane or 0, t.id))
+
+
+def _code_view(t: JoinToken, base: str, tracks: dict, events: dict, svg: bool = True, scale: int = 5) -> dict:
+    url = f"{base}/join/{t.token}"
+    return {
+        "t": t,
+        "url": url,
+        "svg": segno.make(url, error="m").svg_inline(scale=scale, border=2, dark="#000", light="#fff") if svg else "",
+        "track": tracks.get(t.track_id),
+        "event": events.get(t.event_id),
+    }
+
+
+@router.get("/officials/print")
+def admin_print_codes(request: Request, event_id: int | None = None, ids: str = "", s: Session = Depends(get_session), me=Depends(get_official)):
+    """A sheet of printable codes: one event's, or the ``ids`` picked."""
+    admin_only(me)
+    toks = _evergreen_tokens(s, event_id)
+    if ids:
+        want = {int(x) for x in ids.split(",") if x.strip().isdigit()}
+        toks = [t for t in toks if t.id in want]
+    settings = request.app.state.settings
+    base = auth.base_url(settings, request)
+    tracks = {t.id: t for t in s.exec(select(Track))}
+    events = {e.id: e for e in s.exec(select(Event))}
+    # error level "h" survives a crumpled, taped-up sheet better than "m"
+    codes = []
+    for t in toks:
+        c = _code_view(t, base, tracks, events, svg=False)
+        c["svg"] = segno.make(c["url"], error="h").svg_inline(scale=8, border=3, dark="#000", light="#fff")
+        codes.append(c)
+    return render(request, "admin/print_codes.html", {"codes": codes, "base": base, "pinned": bool(settings.public_base_url)})
 
 
 @router.post("/tokens")
@@ -475,20 +515,26 @@ async def admin_create_token(request: Request, s: Session = Depends(get_session)
                 raise ServiceError("Choose the track for that lane.")
             if not 1 <= lane <= t.lane_count:
                 raise ServiceError(f"{t.name} has lanes 1–{t.lane_count}.")
+        evergreen = f.get("evergreen") == "on"
         if role == Role.lane_official and f.get("all_lanes") == "on" and track_id:
             t = s.get(Track, track_id)
             for n in range(1, t.lane_count + 1):
-                auth.create_join_token(s, role, settings.join_token_minutes, track_id, n, f"{t.name} lane {n}", event_id=event_id)
+                auth.create_join_token(
+                    s, role, settings.join_token_minutes, track_id, n, f"{t.name} lane {n}", event_id=event_id, evergreen=evergreen
+                )
         else:
             label = (f.get("label") or "").strip()
             auth.create_join_token(
-                s, role, settings.join_token_minutes, track_id, lane, label, int(f.get("max_uses") or 1), event_id=event_id
+                s, role, settings.join_token_minutes, track_id, lane, label, int(f.get("max_uses") or 1), event_id=event_id, evergreen=evergreen
             )
-        audit(s, auth.actor_for(me), "token.create", "join_token", None, after={"role": role.value, "event": event_id, "track": track_id, "lane": lane})
+        audit(
+            s, auth.actor_for(me), "token.create", "join_token", None,
+            after={"role": role.value, "event": event_id, "track": track_id, "lane": lane, "evergreen": evergreen},
+        )
         s.commit()
     except (ServiceError, ValueError) as e:
         return back("/admin/officials", getattr(e, "message", str(e)), True)
-    return back("/admin/officials")
+    return back("/admin/officials", "Printable code added. Print it from the list below." if evergreen else "")
 
 
 @router.post("/tokens/{token_id}/revoke")

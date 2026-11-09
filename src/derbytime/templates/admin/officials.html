@@ -32,17 +32,18 @@
     </div>
     <div class="row">
       <label>Label <input name="label" placeholder="e.g. Mrs. Lee"></label>
-      <label>Uses <input name="max_uses" type="number" min="1" value="1" style="width:4.5em"></label>
+      <label id="uses-field">Uses <input name="max_uses" type="number" min="1" value="1" style="width:4.5em"></label>
+      <label id="evergreen-field"><input type="checkbox" name="evergreen" id="evergreen"> Printable (never expires)</label>
       <button class="primary" type="submit">Create</button>
     </div>
-    <p class="small muted">Every official except an admin works one event, shown on their phone. Lane officials need a track and lane (or tick “one code per lane”). Track operators without a track can run any of their event's tracks. A vote official records scouts' choice votes on a tablet. Finished events aren't listed. Codes expire after a few minutes.</p>
+    <p class="small muted">Every official except an admin works one event, shown on their phone. Lane officials need a track and lane (or tick “one code per lane”). Track operators without a track can run any of their event's tracks. A vote official records scouts' choice votes on a tablet. Finished events aren't listed. Codes expire after a few minutes, unless you tick “Printable”: those work for any number of phones until you revoke them or the event is finished, so you can print them once and tape them up at each station. Admin codes can't be printable.</p>
     {% if not open_events %}<p class="msg err">No events are in setup or active. Create or reopen one on the <a href="/admin">admin page</a> first.</p>{% endif %}
   </form>
 </section>
 <script>
 (() => {
   const role = document.getElementById('role'), ev = document.getElementById('event'), track = document.getElementById('track');
-  const lane = document.getElementById('lane');
+  const lane = document.getElementById('lane'), evergreen = document.getElementById('evergreen');
   function syncLanes() {
     // offer only the chosen track's lanes, keeping the pick if it still exists
     const t = track.selectedOptions[0], n = +(t?.dataset.lanes || 0), off = (t?.dataset.off || '').split(',');
@@ -55,6 +56,9 @@
   function sync() {
     const admin = role.value === 'admin', noTrack = admin || role.value === 'vote_official';
     document.getElementById('event-field').hidden = admin;
+    document.getElementById('evergreen-field').hidden = admin;
+    evergreen.disabled = admin;
+    document.getElementById('uses-field').hidden = evergreen.checked && !admin;
     document.getElementById('track-field').hidden = noTrack;
     ev.disabled = admin;
     track.disabled = noTrack;
@@ -66,6 +70,7 @@
   role.addEventListener('change', sync);
   ev.addEventListener('change', sync);
   track.addEventListener('change', syncLanes);
+  evergreen.addEventListener('change', sync);
   sync();
 })();
 </script>
@@ -85,6 +90,39 @@
   </div>
 {% endfor %}
 </div>
+{% endif %}
+
+{% if printable %}
+<section class="card">
+  <h2>Printable codes</h2>
+  <p class="small muted">These never expire. Revoke one if a sheet goes missing; phones already signed in keep working until you revoke them below.</p>
+  {% for ev_id, group in printable | groupby('t.event_id') %}
+  {% set ev = events.get(ev_id) %}
+  <div class="row spread">
+    <h3>{{ ev.name if ev else 'Event ' ~ ev_id }}{% if ev and ev.status.value == 'done' %} <span class="badge">done: codes no longer work</span>{% endif %}</h3>
+    <a class="btn primary" href="/admin/officials/print?event_id={{ ev_id }}" target="_blank">Print all ({{ group | length }})</a>
+  </div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Role</th><th>Track / lane</th><th>Label</th><th class="hide-sm">Scans</th><th></th></tr></thead>
+    <tbody>
+    {% for c in group %}
+      <tr>
+        <td>{{ ROLE_LABELS[c.t.role.value] }}</td>
+        <td class="small">{% if c.track %}{{ c.track.name }}{% endif %}{% if c.t.lane %} · lane {{ c.t.lane }}{% endif %}</td>
+        <td class="small">{{ c.t.label }}</td>
+        <td class="small hide-sm">{{ c.t.uses }}</td>
+        <td><div class="row">
+          <a class="btn small" href="/admin/officials/print?ids={{ c.t.id }}" target="_blank">Print</a>
+          <form method="post" action="/admin/tokens/{{ c.t.id }}/revoke" onsubmit="return confirm('Revoke this printed code? Its printout stops working.')"><button class="small bad" type="submit">Revoke</button></form>
+        </div></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endfor %}
+</section>
 {% endif %}
 
 <section class="card">

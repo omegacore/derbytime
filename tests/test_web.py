@@ -209,6 +209,60 @@ def test_admin_creates_lane_codes_with_qr(admin, app):
     assert f'data-lanes="2"' in admin.get("/admin/officials").text
 
 
+
+def test_evergreen_codes_never_expire_and_take_many_phones(app, admin):
+    g = track(app, "regatta")
+    r = admin.post("/admin/tokens", data={"role": "lane_official", "track_id": g.id, "all_lanes": "on", "evergreen": "on"}, follow_redirects=False)
+    assert r.status_code == 303 and "Printable" in r.headers["location"]
+    with Session(app.state.engine) as s:
+        toks = s.exec(select(JoinToken).where(JoinToken.evergreen == True)).all()  # noqa: E712
+        assert sorted(t.lane for t in toks) == [1, 2]
+        lane1 = next(t for t in toks if t.lane == 1)
+        lane1.expires_at = utcnow() - timedelta(days=400)  # long past the short-lived window
+        s.commit()
+        token, tid = lane1.token, lane1.id
+    # many phones, long after creation
+    for _ in range(3):
+        c = other_client(app)
+        assert c.get(f"/join/{token}").status_code == 200
+        r = c.post(f"/join/{token}", follow_redirects=False)
+        assert r.headers["location"] == f"/track/{g.id}/lane/1"
+    # they're listed as printable, not among the short-lived codes, and print on a sheet
+    page = admin.get("/admin/officials").text
+    assert "Printable codes" in page and f"/admin/officials/print?ids={tid}" in page
+    assert "Active codes" not in page
+    sheet = admin.get(f"/admin/officials/print?event_id={g.event_id}").text
+    assert sheet.count('class="placard') == 2 and sheet.count("<svg") == 2 and f"/join/{token}" in sheet
+    assert "public_base_url" in sheet  # warns that the auto-detected address may change
+    one = admin.get(f"/admin/officials/print?ids={tid}").text
+    assert one.count('class="placard') == 1 and "Lane 1" in one
+    assert other_client(app).get("/admin/officials/print").status_code == 403
+    # revoking stops the printout
+    admin.post(f"/admin/tokens/{tid}/revoke")
+    assert "revoked" in other_client(app).post(f"/join/{token}").text
+
+
+def test_evergreen_codes_end_with_their_event(app, admin):
+    with Session(app.state.engine) as s:
+        ev = s.exec(select(Event)).first()
+        jt = auth.create_join_token(s, Role.checkin, 10, event_id=ev.id, evergreen=True)
+        s.commit()
+        token = jt.token
+        assert other_client(app).get(f"/join/{token}").status_code == 200
+        ev.status = "done"
+        s.add(ev)
+        s.commit()
+    r = other_client(app).post(f"/join/{token}")
+    assert r.status_code == 410 and "is finished" in r.text
+
+
+def test_no_evergreen_admin_codes(app, admin):
+    r = admin.post("/admin/tokens", data={"role": "admin", "evergreen": "on"})
+    assert "can't be printable" in r.text
+    with Session(app.state.engine) as s:
+        assert not s.exec(select(JoinToken).where(JoinToken.evergreen == True)).all()  # noqa: E712
+
+
 def test_lane_official_scope_and_revoke(app, admin):
     g = track(app, "regatta")
     lane_client = other_client(app)

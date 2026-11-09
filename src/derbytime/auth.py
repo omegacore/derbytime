@@ -3,6 +3,10 @@
 The admin page shows QR codes for short-lived JoinTokens bound to a role, an
 event (except for admins) and optionally a track/lane. Redeeming one creates an Official and sets a random
 device cookie; only its SHA-256 is stored. Viewers never log in.
+
+Evergreen codes are printed and reused: they never expire and take any number
+of scans until revoked or their event is finished. Admin codes can't be
+evergreen, since a photo of the sheet would hand out the whole app.
 """
 from __future__ import annotations
 
@@ -15,7 +19,7 @@ from fastapi import Request
 from sqlmodel import Session, select
 
 from .config import Settings
-from .models import Event, JoinToken, Official, Role, Track, utcnow
+from .models import Event, EventStatus, JoinToken, Official, Role, Track, utcnow
 from .services import Actor, ServiceError
 
 COOKIE = "rm_device"
@@ -43,9 +47,12 @@ def create_join_token(
     label: str = "",
     max_uses: int = 1,
     event_id: int | None = None,
+    evergreen: bool = False,
 ) -> JoinToken:
     if role == Role.lane_official and (track_id is None or lane is None):
         raise ServiceError("Lane officials need a track and lane.")
+    if evergreen and role == Role.admin:
+        raise ServiceError("Admin codes can't be printable. Make a short-lived one instead.")
     if track_id is not None:
         track = session.get(Track, track_id)
         if track is None:
@@ -62,17 +69,27 @@ def create_join_token(
         label=label,
         max_uses=max(1, max_uses),
         expires_at=utcnow() + timedelta(minutes=minutes),
+        evergreen=evergreen,
     )
+    if evergreen:
+        if event_id is None:
+            raise ServiceError("Printable codes need an event.")
+        jt.max_uses = 1  # unused: evergreen codes count scans in `uses` without a limit
     session.add(jt)
     session.flush()
     return jt
 
 
-def token_problem(jt: JoinToken | None) -> str | None:
+def token_problem(jt: JoinToken | None, event: Event | None = None) -> str | None:
+    """Why ``jt`` can't be used now, or None. ``event`` is the code's event, if any."""
     if jt is None:
         return "This join code is not valid."
     if jt.revoked:
         return "This join code was revoked."
+    if event is not None and event.status == EventStatus.done:
+        return f"{event.name} is finished. Ask the admin for a code for the current event."
+    if jt.evergreen:
+        return None
     if jt.uses >= jt.max_uses:
         return "This join code has already been used."
     if jt.expires_at < utcnow():
@@ -82,7 +99,7 @@ def token_problem(jt: JoinToken | None) -> str | None:
 
 def redeem(session: Session, token: str) -> tuple[Official, str]:
     jt = session.exec(select(JoinToken).where(JoinToken.token == token)).first()
-    problem = token_problem(jt)
+    problem = token_problem(jt, session.get(Event, jt.event_id) if jt and jt.event_id else None)
     if problem:
         raise ServiceError(problem, 410)
     device = secrets.token_urlsafe(32)
