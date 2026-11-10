@@ -101,6 +101,12 @@ def den_key(session: Session, group_id: int | None) -> tuple:
     return group_key(session.get(Group, group_id) if group_id else None)
 
 
+def den_in_final(session: Session, group_id: int | None) -> bool:
+    """Whether a den sends finalists to the pack final (scouts without a den do)."""
+    g = session.get(Group, group_id) if group_id else None
+    return g is None or g.in_final is not False
+
+
 def pass_name(den: str, n: int) -> str:
     return den if n == 1 else f"{den} · run {n}"
 
@@ -869,6 +875,8 @@ def create_final(session: Session, event: Event, track_id: int | None, actor: Ac
     blocks = [b for b in event_standings(session, event) if b["round"].kind == RoundKind.group]
     if not blocks:
         raise ServiceError("Generate the den rounds first.")
+    # dens kept out of the final don't hold it up with unfinished heats or ties
+    blocks = [b for b in blocks if den_in_final(session, b["round"].group_id)]
     finalists: list[int] = []
     gone = entries_with_status(session, event.id, *EntryStatus)
     for b in blocks:

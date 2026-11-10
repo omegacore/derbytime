@@ -475,6 +475,36 @@ def test_standings_final_and_runoff(settings, engine, demo):
     run(body)
 
 
+def test_den_kept_out_of_final(settings, engine, demo):
+    """A den kept out of the final (e.g. siblings) sends no finalists, and a tie
+    at its finalist cutoff doesn't hold the final up."""
+    derby, _ = demo
+
+    async def body():
+        svc, _ = await make_service(settings, engine)
+        with svc.session() as s:
+            track = tracks_of(s, derby)[0]
+            entries = s.exec(select(Entry).where(Entry.event_id == derby.id).order_by(Entry.number)).all()
+            bear = s.exec(select(Group).where(Group.name == "Bear Den 5")).one()
+            bear.in_final = False
+            s.add(bear)
+            s.commit()
+        speed = {e.id: 3.0 + i * 0.01 for i, e in enumerate(entries)}
+        bears = [e for e in entries if e.number > 110]
+        speed[bears[3].id] = speed[bears[2].id]  # a Bear tie that would need a runoff
+        await race_all(svc, track.id, speed.get)
+
+        with svc.session() as s:
+            ev = s.get(Event, derby.id)
+            final = create_final(s, ev, None, ACTOR)
+            s.commit()
+            fin = {hl.entry_id for hl in s.exec(select(HeatLane).join(Heat).where(Heat.round_id == final.id)) if hl.entry_id}
+            assert sorted(e.number for e in entries if e.id in fin) == [101, 102, 103]
+        await svc.stop()
+
+    run(body)
+
+
 def test_projected_finish_uses_estimate_then_measured_pace(session, demo):
     from datetime import timedelta
 

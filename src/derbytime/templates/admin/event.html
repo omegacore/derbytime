@@ -152,7 +152,20 @@
     <h3>Den standings &amp; final</h3>
     {% for block in standings %}
       <div style="border-bottom:1px solid var(--line);padding:8px 0">
-        <div class="row spread"><strong>{{ block.name }}</strong><span class="small muted">{{ block.approved }}/{{ block.total }} heats approved</span></div>
+        {% set gid = block.round.group_id %}
+        <div class="row spread">
+          <strong>{{ block.name }}{% if gid in out_of_final %} <span class="badge">not in final</span>{% endif %}</strong>
+          <span class="row small">
+            <span class="muted">{{ block.approved }}/{{ block.total }} heats approved</span>
+            {% if gid %}
+            <form method="post" action="/admin/group/{{ gid }}/final">
+              <input type="hidden" name="event_id" value="{{ event.id }}">
+              <input type="hidden" name="in_final" value="{{ '1' if gid in out_of_final else '0' }}">
+              <button class="small" type="submit">{{ 'Put in final' if gid in out_of_final else 'Keep out of final' }}</button>
+            </form>
+            {% endif %}
+          </span>
+        </div>
         {% if block.disqualified %}<div class="small"><span class="flag">Disqualified:</span> {% for d in block.disqualified %}#{{ d.number }} {{ d.racer_name }} ({{ d.status_reason }}){% if not loop.last %}, {% endif %}{% endfor %}</div>{% endif %}
         {% for tie in block.ties %}
           <form class="row small" method="post" action="/admin/event/{{ event.id }}/runoff" style="margin-top:6px">
@@ -168,7 +181,7 @@
     <div class="row" style="margin-top:12px">
       <form class="row" method="post" action="/admin/event/{{ event.id }}/final">
         <select name="track_id">{% for t in tracks if t.active %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select>
-        <button class="primary" type="submit">Create final (top {{ event.finalists_per_group }} per den)</button>
+        <button class="primary" type="submit">Create final (top {{ event.finalists_per_group }} per den{% if standings | selectattr('round.group_id', 'in', out_of_final) | list %}, skipping {{ standings | selectattr('round.group_id', 'in', out_of_final) | map(attribute='name') | join(', ') }}{% endif %})</button>
       </form>
       <form method="post" action="/admin/event/{{ event.id }}/clear" onsubmit="return confirm('Delete all rounds and heats for this event?')">
         <button class="bad" type="submit">Clear schedule</button>

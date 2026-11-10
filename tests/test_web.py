@@ -7,7 +7,7 @@ from sqlmodel import Session, select
 
 from derbytime import auth
 from derbytime.app import create_app
-from derbytime.models import Entry, Event, Heat, HeatLane, HeatStatus, JoinToken, Official, Role, Track, utcnow
+from derbytime.models import AuditLog, Entry, Event, Group, Heat, HeatLane, HeatStatus, JoinToken, Official, Role, Track, utcnow
 from derbytime.seed import seed_demo
 
 
@@ -501,6 +501,25 @@ def test_admin_event_setup_end_to_end(app, admin):
     assert "not approved yet" in r.text
     # new event's track is live on the public page
     assert "Track 1" in admin.get("/partials/home").text
+
+
+def test_admin_keeps_den_out_of_final(app, admin):
+    ev_id, _ = race_order_ids(app, "derby")
+    with Session(app.state.engine) as s:
+        bear = s.exec(select(Group).where(Group.name == "Bear Den 5")).one()
+    assert "Keep out of final" in admin.get(f"/admin/event/{ev_id}").text
+    assert other_client(app).post(f"/admin/group/{bear.id}/final", data={"in_final": "0"}).status_code == 403
+
+    r = admin.post(f"/admin/group/{bear.id}/final", data={"event_id": ev_id, "in_final": "0"}, follow_redirects=True)
+    assert "kept out of the pack final" in r.text
+    assert "not in final" in r.text and "skipping Bear Den 5" in r.text and "Put in final" in r.text
+    with Session(app.state.engine) as s:
+        assert s.get(Group, bear.id).in_final is False
+        assert s.exec(select(AuditLog).where(AuditLog.action == "group.update")).first()
+
+    admin.post(f"/admin/group/{bear.id}/final", data={"event_id": ev_id, "in_final": "1"})
+    with Session(app.state.engine) as s:
+        assert s.get(Group, bear.id).in_final is True
 
 
 def race_order_ids(app, event_type):

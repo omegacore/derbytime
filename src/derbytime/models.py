@@ -97,6 +97,9 @@ class Group(SQLModel, table=True):
     name: str = Field(unique=True)
     rank: Optional[str] = None
     sort_order: int = 0
+    # False keeps the den (e.g. siblings and parents) out of the pack final;
+    # nullable so older databases gain the column on start (None = in it)
+    in_final: Optional[bool] = True
 
 
 class Racer(SQLModel, table=True):

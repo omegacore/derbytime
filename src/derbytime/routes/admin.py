@@ -132,6 +132,7 @@ def admin_event(event_id: int, request: Request, s: Session = Depends(get_sessio
             "problems": schedule_problems(s, ev) if rounds else {},
             "projection": projected_finish(s, ev, td.heat_seconds + td.heat_overhead_seconds) if rounds else None,
             "dens": [(gid, den_name(s, gid)) for gid in sorted(den_entries(s, ev.id), key=lambda gid: den_key(s, gid))],
+            "out_of_final": {g.id for g in s.exec(select(Group)) if g.in_final is False},
             "default_passes": td.passes_per_den,
             "default_races": max((len(t.usable_lanes) for t in tracks if t.active), default=td.lane_count),
             "max_races": MAX_RACES,
@@ -403,6 +404,24 @@ async def admin_runoff(event_id: int, request: Request, s: Session = Depends(get
         ids = [int(x) for x in str(f.get("entry_ids", "")).split(",") if x]
         create_runoff(s, ev, parent, ids, int(f["track_id"]) if f.get("track_id") else None, auth.actor_for(me))
     return await _schedule_action(request, event_id, s, me, rs, fn, "Runoff added to the queue.")
+
+
+@router.post("/group/{group_id}/final")
+async def admin_den_final(group_id: int, request: Request, s: Session = Depends(get_session), me=Depends(get_official)):
+    """Keep a den (e.g. siblings and parents) out of the pack final, or put it back.
+    Pack-wide, like the den itself."""
+    admin_only(me)
+    f = await form(request)
+    url = f"/admin/event/{int(f.get('event_id') or 0)}" if f.get("event_id") else "/admin"
+    g = s.get(Group, group_id)
+    if g is None:
+        return back(url, "Den not found.", True)
+    before = g.in_final is not False
+    g.in_final = f.get("in_final") == "1"
+    s.add(g)
+    audit(s, auth.actor_for(me), "group.update", "group", g.id, before={"in_final": before}, after={"in_final": g.in_final})
+    s.commit()
+    return back(url, f"{g.name} is {'in' if g.in_final else 'kept out of'} the pack final.")
 
 
 # --- officials & QR codes -------------------------------------------------------------
