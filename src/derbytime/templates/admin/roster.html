@@ -9,6 +9,18 @@
 <p class="small muted">Every scout the pack has imported, shared by all events. Inactive scouts aren't scheduled; a roster import that lists them as Active again brings them back. Edit a scout to fix a name or den, set a Member ID, merge a duplicate, or withdraw or disqualify them in an event.</p>
 
 <section class="card">
+  <h2>Add a scout</h2>
+  <form class="row" method="post" action="/admin/racers">
+    <input name="first_name" placeholder="First name" required>
+    <input name="last_name" placeholder="Last name">
+    <input name="den" placeholder="Den" list="den-list" required>
+    <input name="member_id" placeholder="Member ID (optional)">
+    <button class="primary" type="submit">Add</button>
+  </form>
+  <datalist id="den-list">{% for d in dens %}<option value="{{ d }}">{% endfor %}</datalist>
+</section>
+
+<section class="card">
   <input id="roster-q" type="search" placeholder="Search name, den or Member ID" style="width:100%" autocomplete="off">
   <div class="table-wrap" style="margin-top:8px">
   <table id="roster-table">
@@ -23,23 +35,11 @@
         <td><a class="small" href="/admin/racer/{{ r.id }}">Edit</a></td>
       </tr>
     {% else %}
-      <tr><td colspan="5" class="muted">No scouts yet. Import a roster on an event's admin page, or add one below.</td></tr>
+      <tr><td colspan="5" class="muted">No scouts yet. Import a roster on an event's admin page, or add one above.</td></tr>
     {% endfor %}
     </tbody>
   </table>
   </div>
-</section>
-
-<section class="card">
-  <h2>Add a scout</h2>
-  <form class="row" method="post" action="/admin/racers">
-    <input name="first_name" placeholder="First name" required>
-    <input name="last_name" placeholder="Last name">
-    <input name="den" placeholder="Den" list="den-list" required>
-    <input name="member_id" placeholder="Member ID (optional)">
-    <button class="primary" type="submit">Add</button>
-  </form>
-  <datalist id="den-list">{% for d in dens %}<option value="{{ d }}">{% endfor %}</datalist>
 </section>
 {% endblock %}
 {% block scripts %}
