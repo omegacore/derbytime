@@ -8,7 +8,7 @@ One laptop (or a Raspberry Pi) runs the server. Phones on the same Wi-Fi are the
 **Roster and check-in**
 - Import the pack roster export (CSV, tab-separated, or rows pasted from the spreadsheet). Every import shows a preview before it changes anything, and a later import is a sync: matched by Member ID, nobody deleted, inactive scouts stop being scheduled.
 - Only the columns needed to race are stored. Parent contact details, addresses and the rest of the export are ignored.
-- Check-in desk on a phone: checked in, weight, pass/fail inspection. Car/boat numbers are assigned automatically.
+- Check-in desk on a phone: pick a scout from the list and the page walks through it step by step (car/boat name, photo, weight, pass/fail inspection), ending on a big "checked in" confirmation to show the family. Car/boat numbers are assigned automatically.
 - Scouts and dens are pack-wide, so a derby and a regatta share one roster.
 
 **Scheduling**
@@ -218,7 +218,7 @@ Lookup order for the config file: `--config PATH`, then `$DERBYTIME_CONFIG`, the
    - A scout no longer `Active` is marked **inactive**: they stop being scheduled in every event, and their results so far stay. A later roster listing them as Active brings them back.
    - Nobody is ever deleted by an import. Scouts in the event but missing from the file are listed in the preview so you can deal with them.
    - Imports and roster edits don't touch a running schedule by themselves. The event page shows *The schedule is out of date* until you regenerate.
-2. **Check-in** (`/checkin`): mark scouts checked in, record weight and pass/fail inspection. Only checked-in entries that haven't failed inspection are scheduled. You can also tick "mark checked in" on import.
+2. **Check-in** (`/checkin`): tap **Check in** next to a scout and follow the steps (name, photo, weight, inspection). The list shows how many are checked in and can hide the ones already done. *Edit* reopens a scout to re-inspect or undo. Only checked-in entries that haven't failed inspection are scheduled. You can also tick "mark checked in" on import.
 3. **Schedule**: on the event's admin page, *Generate schedule* gives every den **runs**. A run is one full lane rotation: every car runs every lane once. The number of runs per den is set on that form (default `passes_per_den = 2` in config).
    - **Default order:** dens are sorted by name with numbers compared numerically (Den 2 before Den 10). The order snakes down the list and back up, e.g. Den 1, Den 2, Den 3, Den 3 · run 2, Den 2 · run 2, Den 1 · run 2.
    - **Race order list:** drag ☰ (works on touch) or use ↑ ↓ to rearrange at any time, including mid-event. The shared queue updates immediately.

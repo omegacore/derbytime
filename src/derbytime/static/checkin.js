@@ -55,3 +55,69 @@
     if (confirm("Remove this photo?")) send(box, base(box) + "/delete");
   });
 })();
+
+// Step-by-step check-in: one form, shown a step at a time. Nothing is saved
+// until the inspection verdict, so Back is always safe (photos save at once).
+(function () {
+  const form = document.querySelector(".ci-wiz");
+  if (!form) return;
+  const steps = [...form.querySelectorAll(".ci-step")];
+  const dots = [...form.querySelectorAll(".ci-steps li")];
+  let at = 0;
+
+  function show(i) {
+    at = Math.max(0, Math.min(steps.length - 1, i));
+    steps.forEach((s, k) => (s.hidden = k !== at));
+    dots.forEach((d, k) => {
+      d.classList.toggle("now", k === at);
+      d.classList.toggle("past", k < at);
+    });
+    window.scrollTo(0, 0);
+    const weight = steps[at].querySelector("[name=weight_oz]");
+    if (weight) weight.focus(); // the scale is out; save a tap
+  }
+
+  function valid() {
+    const w = steps[at].querySelector("[name=weight_oz]");
+    const v = w ? w.value.trim() : "";
+    if (v && !(Number(v) > 0)) {
+      RM.toast(`${v} is not a weight`, "err");
+      w.focus();
+      return false;
+    }
+    return true;
+  }
+
+  const next = () => valid() && show(at + 1);
+  const save = () => htmx.trigger(form, "submit");
+
+  form.addEventListener("click", (ev) => {
+    const b = ev.target.closest("button");
+    if (!b) return;
+    if (b.hasAttribute("data-next")) next();
+    else if (b.hasAttribute("data-back")) show(at - 1);
+    else if (b.dataset.verdict === "passed") {
+      form.elements.inspection_status.value = "passed";
+      form.elements.inspection_notes.value = "";
+      save();
+    } else if (b.dataset.verdict === "failed") {
+      form.elements.inspection_status.value = "failed";
+      const fail = form.querySelector(".ci-fail");
+      fail.hidden = false;
+      fail.querySelector("input").focus();
+    } else if (b.hasAttribute("data-undo") && confirm("Mark this scout as not checked in?")) {
+      form.elements.checked_in.value = "off";
+      save();
+    }
+  });
+
+  // Enter in a field moves on rather than saving half-way through
+  form.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Enter" || ev.target.tagName !== "INPUT") return;
+    if (ev.target.name === "inspection_notes") return; // last step: Enter checks in as failed
+    ev.preventDefault();
+    next();
+  });
+
+  show(0);
+})();

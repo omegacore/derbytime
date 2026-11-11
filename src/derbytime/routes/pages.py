@@ -323,7 +323,7 @@ def lane_partial(track_id: int, lane: int, request: Request, s: Session = Depend
 
 
 @router.get("/checkin")
-def checkin(request: Request, event: int | None = None, s: Session = Depends(get_session), me=Depends(get_official)):
+def checkin(request: Request, event: int | None = None, just: int | None = None, s: Session = Depends(get_session), me=Depends(get_official)):
     require(auth.can_checkin(me), "check-in")
     if me.event_id:
         events = [e for e in [s.get(Event, me.event_id)] if e]
@@ -340,7 +340,20 @@ def checkin(request: Request, event: int | None = None, s: Session = Depends(get
             .where(Entry.event_id == ev.id)
             .order_by(Entry.number)
         ).all()
-    return render(request, "checkin.html", {"events": events, "event": ev, "rows": rows})
+    return render(request, "checkin.html", {"events": events, "event": ev, "rows": rows, "just": just})
+
+
+@router.get("/checkin/{entry_id}")
+def checkin_entry(entry_id: int, request: Request, s: Session = Depends(get_session), me=Depends(get_official)):
+    """One scout's check-in, a step at a time; saving shows the confirmation."""
+    require(auth.can_checkin(me), "check-in")
+    entry = s.get(Entry, entry_id)
+    if not entry or (me.event_id and entry.event_id != me.event_id):
+        raise ServiceError("Entry not found", 404)
+    racer = s.get(Racer, entry.racer_id)
+    group = s.get(Group, racer.group_id) if racer.group_id else None
+    ev = s.get(Event, entry.event_id)
+    return render(request, "checkin_entry.html", {"e": entry, "r": racer, "g": group, "event": ev})
 
 
 # --- joining -------------------------------------------------------------------

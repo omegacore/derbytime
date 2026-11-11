@@ -1,0 +1,25 @@
+{# The last step of check-in: a clear "done" the volunteer can show the family. #}
+{% set label = "Boat" if event.type.value == "regatta" else "Car" %}
+{% set failed = e.inspection_status.value == "failed" %}
+<div class="ci-done {{ 'off' if not e.checked_in else ('warn' if failed else 'ok') }}" role="status">
+  <div class="ci-done-mark" aria-hidden="true">{{ '↺' if not e.checked_in else ('!' if failed else '✓') }}</div>
+  <div class="ci-done-num">#{{ e.number }}</div>
+  <div class="ci-done-name">{{ r.display_name }}</div>
+  {% if not e.checked_in %}
+  <p class="ci-done-say">is no longer checked in</p>
+  {% elif failed %}
+  <p class="ci-done-say">is checked in, but <strong>failed inspection</strong></p>
+  <p>Won’t be scheduled until the {{ label | lower }} passes.{% if e.inspection_notes %} Fix: {{ e.inspection_notes }}{% endif %}</p>
+  {% else %}
+  <p class="ci-done-say">is checked in</p>
+  {% endif %}
+  <dl class="ci-done-facts">
+    <div><dt>{{ label }}</dt><dd>{{ e.name or '—' }}</dd></div>
+    <div><dt>Weight</dt><dd>{{ '%g oz' % e.weight_oz if e.weight_oz is not none else '—' }}</dd></div>
+    <div><dt>Den</dt><dd>{{ g.name if g else '—' }}</dd></div>
+  </dl>
+</div>
+<div class="ci-nav">
+  <a class="btn" href="/checkin/{{ e.id }}">{{ 'Re-inspect' if failed else 'Edit' }}</a>
+  <a class="btn primary" href="/checkin?event={{ e.event_id }}&just={{ e.id }}">Next scout →</a>
+</div>

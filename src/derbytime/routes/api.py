@@ -223,7 +223,7 @@ async def checkin(entry_id: int, request: Request, s: Session = Depends(get_sess
     racer = s.get(Racer, entry.racer_id)
     group = s.get(Group, racer.group_id) if racer.group_id else None
     ev = s.get(Event, entry.event_id)
-    return render(request, "partials/checkin_row.html", {"e": entry, "r": racer, "g": group, "event": ev, "saved": True})
+    return render(request, "partials/checkin_done.html", {"e": entry, "r": racer, "g": group, "event": ev})
 
 
 # Check-in photos. kind "entry" is the car or boat; it maps to an Entry column

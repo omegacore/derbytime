@@ -1,6 +1,5 @@
 {% extends "base.html" %}
 {% block title %}Check-in{% endblock %}
-{% block scripts %}<script src="/static/checkin.js"></script>{% endblock %}
 {% block content %}
 <div class="row spread">
   <h1>Check-in</h1>
@@ -13,11 +12,39 @@
   {% elif event %}<span class="badge">{{ event.name }}</span>{% endif %}
 </div>
 {% if not event %}<p class="muted">No events.</p>{% else %}
-<p class="muted small">Only checked-in entries that haven't failed inspection are scheduled. Tap a photo box to take a picture with this phone’s camera.</p>
-<input type="search" placeholder="Filter by name or number" style="width:100%;margin-bottom:12px"
-       oninput="const q=this.value.toLowerCase();document.querySelectorAll('.ci-row').forEach(r=>r.style.display=r.dataset.q.includes(q)?'':'none')">
-<div id="ci-list">
-{% for e, r, g in rows %}{% include "partials/checkin_row.html" %}{% endfor %}
+{% set done = rows | selectattr("0.checked_in") | list | length %}
+<p class="ci-count"><strong>{{ done }}</strong> of {{ rows | length }} checked in</p>
+<div class="ci-filter">
+  <input type="search" id="ci-search" placeholder="Find a scout by name or number" autocomplete="off" oninput="ciFilter()">
+  <label><input type="checkbox" id="ci-todo" onchange="ciFilter()"> Not checked in yet</label>
 </div>
+<div id="ci-list">
+{% for e, r, g in rows %}
+  <div class="card ci-row{% if e.id == just %} ci-just{% endif %}" id="e{{ e.id }}" data-q="{{ e.number }} {{ r.display_name | lower }}"{% if e.checked_in %} data-done{% endif %}>
+    <div class="ci-who">
+      <strong>#{{ e.number }} {{ r.display_name }}</strong>
+      <span class="muted small">{{ g.name if g else '' }}{% if e.name %} · “{{ e.name }}”{% endif %}</span>
+      {% if e.checked_in and e.inspection_status.value == 'failed' %}<span><span class="badge bad">Failed inspection</span></span>
+      {% elif e.checked_in %}<span><span class="badge ok">✓ Checked in</span></span>{% endif %}
+    </div>
+    {% if e.checked_in %}<a class="btn" href="/checkin/{{ e.id }}">Edit</a>
+    {% else %}<a class="btn primary" href="/checkin/{{ e.id }}">Check in</a>{% endif %}
+  </div>
+{% endfor %}
+</div>
+<script>
+function ciFilter() {
+  const q = document.getElementById("ci-search").value.toLowerCase();
+  const todo = document.getElementById("ci-todo").checked;
+  try { localStorage.setItem("ci-todo", todo ? "1" : ""); } catch (e) {}
+  document.querySelectorAll(".ci-row").forEach((r) => {
+    r.hidden = !r.dataset.q.includes(q) || (todo && r.hasAttribute("data-done"));
+  });
+}
+// the volunteer's "not checked in yet" choice stays on from scout to scout
+try { document.getElementById("ci-todo").checked = !!localStorage.getItem("ci-todo"); } catch (e) {}
+ciFilter();
+</script>
+{% if just %}<script>document.getElementById("e{{ just }}")?.scrollIntoView({block: "center"});</script>{% endif %}
 {% endif %}
 {% endblock %}

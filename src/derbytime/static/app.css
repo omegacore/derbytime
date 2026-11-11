@@ -204,8 +204,6 @@ body.ondeck main { padding: 1.2vw 2vw; }
 
 /* a scout's car/boat name after their name; its own line on phones */
 .car-name::before { content: "· "; }
-.ci-name { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
-.ci-name input { flex: 1; min-width: 0; }
 
 @media (max-width: 600px) {
   .hide-sm { display: none; }
@@ -384,6 +382,53 @@ body.board main { max-width: none; padding: 0; }
 .ci-photo.busy label { opacity: .5; pointer-events: none; }
 .ci-photo-del { display: none; position: absolute; top: -8px; right: -8px; min-height: 0; width: 26px; height: 26px; padding: 0; border-radius: 50%; line-height: 1; font-weight: 700; background: var(--panel); }
 .ci-photo.has .ci-photo-del { display: block; }
+.ci-photos-big { justify-content: center; margin: 16px 0; }
+.ci-photos-big .ci-photo label { width: 200px; height: 200px; }
+.ci-photos-big .ci-photo-empty { font-size: 3rem; }
+
+/* check-in list: one row per scout, a button starts the steps */
+.ci-count { font-size: 1.1rem; margin: 4px 0 10px; }
+.ci-filter { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.ci-filter input[type=search] { width: 100%; }
+.ci-row { display: flex; align-items: center; gap: 10px; }
+.ci-row[hidden] { display: none; }
+.ci-who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ci-row .btn { flex: none; min-width: 6.5em; justify-content: center; }
+.ci-just { border-color: var(--ok); box-shadow: 0 0 0 2px var(--ok); }
+
+/* check-in steps */
+.ci-head { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+.ci-num { font-size: 2rem; font-weight: 800; color: var(--accent); }
+.ci-scout { font-size: 1.5rem; font-weight: 700; line-height: 1.2; }
+.ci-steps { display: flex; gap: 4px; list-style: none; padding: 0; margin: 0 0 16px; counter-reset: ci; }
+.ci-steps li { flex: 1; counter-increment: ci; text-align: center; font-size: .8rem; color: var(--muted); padding-top: 8px; border-top: 4px solid var(--line); }
+.ci-steps li::before { content: counter(ci) ". "; }
+.ci-steps li.past { border-color: var(--ok); }
+.ci-steps li.now { border-color: var(--accent); color: var(--ink); font-weight: 700; }
+.ci-step h2 { margin: 0 0 6px; }
+.ci-field { display: flex; flex-direction: column; align-items: stretch; gap: 4px; margin: 14px 0; font-weight: 600; }
+.ci-field input { font-size: 1.25rem; width: 100%; }
+.ci-nav { display: flex; gap: 10px; margin-top: 18px; }
+.ci-nav > * { flex: 1; justify-content: center; min-height: 52px; }
+.ci-verdict { display: flex; gap: 10px; margin: 16px 0; }
+.ci-verdict button, .ci-wide { flex: 1; width: 100%; min-height: 72px; font-size: 1.3rem; font-weight: 700; }
+.ci-undo { text-align: center; margin-top: 28px; }
+
+/* check-in done: big enough to show the family across the table */
+.ci-done { text-align: center; border-radius: 16px; padding: 22px 16px; border: 3px solid; }
+.ci-done.ok { background: var(--ok-bg); border-color: var(--ok); }
+.ci-done.warn { background: var(--warn-bg); border-color: var(--warn); }
+.ci-done.off { background: var(--panel); border-color: var(--line); }
+.ci-done-mark { width: 84px; height: 84px; margin: 0 auto 8px; border-radius: 50%; display: grid; place-items: center; font-size: 3rem; font-weight: 800; color: #fff; background: var(--ok); }
+.ci-done.warn .ci-done-mark { background: var(--warn); }
+.ci-done.off .ci-done-mark { background: var(--muted); }
+.ci-done-num { font-size: 1.2rem; font-weight: 700; color: var(--muted); }
+.ci-done-name { font-size: 1.8rem; font-weight: 800; line-height: 1.2; }
+.ci-done-say { font-size: 1.3rem; margin: 6px 0; }
+.ci-done.ok .ci-done-say { color: var(--ok); font-weight: 700; }
+.ci-done-facts { display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; margin: 14px 0 0; }
+.ci-done-facts dt { font-size: .75rem; color: var(--muted); text-transform: uppercase; }
+.ci-done-facts dd { margin: 0; font-weight: 600; }
 .vehicle-photo { display: block; width: 100%; max-width: 420px; max-height: 300px; object-fit: cover; border-radius: 10px; margin: 8px 0; }
 .kiosk-who img { height: 6vw; width: 8vw; object-fit: cover; border-radius: .8vw; vertical-align: middle; margin-right: 1.5vw; }
 

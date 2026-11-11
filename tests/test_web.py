@@ -588,11 +588,31 @@ def test_race_order_is_admin_only(app):
 def test_checkin(app):
     c = other_client(app)
     join(app, c, Role.checkin)
+    with Session(app.state.engine) as s:
+        s.get(Entry, 1).checked_in = False
+        s.commit()
+        total = len(s.exec(select(Entry).where(Entry.event_id == s.get(Entry, 1).event_id)).all())
     page = c.get("/checkin").text
-    assert "Liam" in page
-    r = c.post("/api/entry/1/checkin", data={"weight_oz": "4.9", "inspection_status": "passed"})
-    assert r.status_code == 200 and "saved" in r.text and "4.9" in r.text
+    assert "Liam" in page and 'href="/checkin/1">Check in<' in page and f"{total - 1}</strong> of {total}" in page
+    # the steps open from the list; saving ends on a clear confirmation
+    steps = c.get("/checkin/1").text
+    assert "Is this the right scout?" in steps and 'data-verdict="passed"' in steps and "Undo check-in" not in steps
+    r = c.post("/api/entry/1/checkin", data={"checked_in": "on", "weight_oz": "4.9", "inspection_status": "passed"})
+    assert r.status_code == 200 and "is checked in" in r.text and "4.9 oz" in r.text and "&just=1" in r.text
+    page = c.get("/checkin?just=1").text
+    assert f"{total}</strong> of {total}" in page and "✓ Checked in" in page and 'href="/checkin/1">Edit<' in page and "ci-just" in page
+    assert "Undo check-in" in c.get("/checkin/1").text
+    # failing inspection still checks in, but says the car won't race
+    r = c.post("/api/entry/1/checkin", data={"checked_in": "on", "inspection_status": "failed", "inspection_notes": "too heavy"})
+    assert "failed inspection" in r.text and "too heavy" in r.text and "Re-inspect" in r.text
+    assert "Failed inspection" in c.get("/checkin").text
+    # undo
+    r = c.post("/api/entry/1/checkin", data={"checked_in": "off", "inspection_status": "passed"})
+    assert "no longer checked in" in r.text
+    with Session(app.state.engine) as s:
+        assert not s.get(Entry, 1).checked_in
     assert c.post("/api/entry/1/checkin", data={"weight_oz": "heavy"}).status_code == 400
+    assert c.get("/checkin/9999").status_code == 404
 
 
 def test_checkin_names_the_car(app, monkeypatch):
@@ -602,7 +622,8 @@ def test_checkin_names_the_car(app, monkeypatch):
     real = app.state.bus.publish
     monkeypatch.setattr(app.state.bus, "publish", lambda t, d=None, keys=None: published.append(keys) or real(t, d, keys))
     r = c.post("/api/entry/1/checkin", data={"car_name": "  The   Blue\tBlur  ", "inspection_status": "passed"})
-    assert r.status_code == 200 and 'value="The Blue Blur"' in r.text
+    assert r.status_code == 200 and "The Blue Blur" in r.text
+    assert 'value="The Blue Blur"' in c.get("/checkin/1").text
     with Session(app.state.engine) as s:
         e = s.get(Entry, 1)
         assert e.name == "The Blue Blur"
@@ -632,14 +653,14 @@ def test_checkin_photos(app, client):
     c = other_client(app)
     join(app, c, Role.checkin)
     photos = app.state.settings.data_dir / "photos"
-    assert 'capture="environment"' in c.get("/checkin").text
+    assert 'capture="environment"' in c.get("/checkin/1").text
 
     r = c.post("/api/entry/1/photo/entry", files={"photo": ("car.jpg", JPEG, "image/jpeg")})
     assert r.status_code == 200, r.text
     first = r.json()["url"]
     assert c.get(first).content == JPEG
     assert len(list(photos.iterdir())) == 1
-    assert "/api/entry/1/photo/entry?v=" in c.get("/checkin").text
+    assert "/api/entry/1/photo/entry?v=" in c.get("/checkin/1").text
     # scouts themselves aren't photographed
     assert c.post("/api/entry/1/photo/scout", files={"photo": ("s.jpg", JPEG, "image/jpeg")}).status_code == 404
     # the car shows on the public racer page
@@ -787,6 +808,12 @@ def test_event_bound_officials_only_see_their_event(app):
     join(app, ci, Role.checkin, event_id=d.event_id)
     html = ci.get(f"/checkin?event={g.event_id}").text
     assert '<select name="event"' not in html
+    # nor open another event's scouts
+    with Session(app.state.engine) as s:
+        other = s.exec(select(Entry).where(Entry.event_id == g.event_id)).first()
+        mine = s.exec(select(Entry).where(Entry.event_id == d.event_id)).first()
+    assert ci.get(f"/checkin/{other.id}").status_code == 404
+    assert ci.get(f"/checkin/{mine.id}").status_code == 200
 
 
 def test_page_cache_renders_once_for_concurrent_viewers():
