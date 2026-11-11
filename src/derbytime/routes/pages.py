@@ -25,6 +25,7 @@ from ..models import (
     Track,
 )
 from ..services import ServiceError, views
+from ..services.checkin import measure_for
 from ..services.race import RaceService
 from ..services.schedule import event_standings, pack_standings
 from .deps import get_official, get_session, public_cached, race, render, require
@@ -367,7 +368,8 @@ def checkin_entry(entry_id: int, request: Request, s: Session = Depends(get_sess
     racer = s.get(Racer, entry.racer_id)
     group = s.get(Group, racer.group_id) if racer.group_id else None
     ev = s.get(Event, entry.event_id)
-    return render(request, "checkin_entry.html", {"e": entry, "r": racer, "g": group, "event": ev})
+    m = measure_for(ev, request.app.state.settings)
+    return render(request, "checkin_entry.html", {"e": entry, "r": racer, "g": group, "event": ev, "m": m})
 
 
 # --- joining -------------------------------------------------------------------

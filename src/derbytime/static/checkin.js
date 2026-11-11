@@ -73,19 +73,22 @@
       d.classList.toggle("past", k < at);
     });
     window.scrollTo(0, 0);
-    const weight = steps[at].querySelector("[name=weight_oz]");
-    if (weight) weight.focus(); // the scale is out; save a tap
+    const measure = steps[at].querySelector(".ci-measure");
+    if (measure) measure.focus(); // the scale or ruler is out; save a tap
   }
 
+  // derby weight or regatta length: optional unless config.toml requires it
   function valid() {
-    const w = steps[at].querySelector("[name=weight_oz]");
-    const v = w ? w.value.trim() : "";
-    if (v && !(Number(v) > 0)) {
-      RM.toast(`${v} is not a weight`, "err");
-      w.focus();
-      return false;
-    }
-    return true;
+    const m = steps[at].querySelector(".ci-measure");
+    if (!m) return true;
+    const v = m.value.trim();
+    let problem = "";
+    if (!v && m.hasAttribute("data-required")) problem = `Enter the ${m.dataset.label} to go on`;
+    else if (v && !(Number(v) > 0)) problem = `${v} is not a ${m.dataset.label}`;
+    if (!problem) return true;
+    RM.toast(problem, "err");
+    m.focus();
+    return false;
   }
 
   const next = () => valid() && show(at + 1);

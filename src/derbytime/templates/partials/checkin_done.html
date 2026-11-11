@@ -15,7 +15,7 @@
   {% endif %}
   <dl class="ci-done-facts">
     <div><dt>{{ label }}</dt><dd>{{ e.name or '—' }}</dd></div>
-    <div><dt>Weight</dt><dd>{{ '%g oz' % e.weight_oz if e.weight_oz is not none else '—' }}</dd></div>
+    <div><dt>{{ m.label }}</dt><dd>{{ m.shown(e) }}</dd></div>
     <div><dt>Den</dt><dd>{{ g.name if g else '—' }}</dd></div>
   </dl>
 </div>

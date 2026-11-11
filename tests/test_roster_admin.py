@@ -433,6 +433,7 @@ def test_admin_roster_pages_and_dq_flow(app, admin):  # noqa: F811
     for kind in ("roster", "standings", "heats"):
         r = admin.get(f"/admin/event/{ev.id}/export/{kind}.csv")
         assert r.status_code == 200 and r.headers["content-type"].startswith("text/csv")
+    assert "Weight (oz),Length (in)," in admin.get(f"/admin/event/{ev.id}/export/roster.csv").text
     assert "555" in admin.get("/admin/roster.csv").text
     r = admin.get("/admin/backup")
     assert r.status_code == 200 and r.content.startswith(b"SQLite format 3")

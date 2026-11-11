@@ -633,6 +633,46 @@ def test_checkin(app):
     assert c.get("/checkin/9999").status_code == 404
 
 
+def test_checkin_measures_weight_or_length(app):
+    """A derby car is weighed, a regatta boat measured; neither is required
+    unless config.toml says so."""
+    c = other_client(app)
+    join(app, c, Role.checkin)
+    with Session(app.state.engine) as s:
+        car = s.exec(select(Entry).join(Event, Event.id == Entry.event_id).where(Event.type == "derby")).first().id
+        boat = s.exec(select(Entry).join(Event, Event.id == Entry.event_id).where(Event.type == "regatta")).first().id
+
+    page = c.get(f"/checkin/{car}").text
+    assert 'name="weight_oz"' in page and "length_in" not in page and "Weigh the car" in page and "(optional)" in page
+    page = c.get(f"/checkin/{boat}").text
+    assert 'name="length_in"' in page and "weight_oz" not in page and "Measure the boat" in page and "<li>Length</li>" in page
+
+    # optional by default: checks in with no measurement
+    assert c.post(f"/api/entry/{boat}/checkin", data={"checked_in": "on", "length_in": "", "inspection_status": "passed"}).status_code == 200
+    r = c.post(f"/api/entry/{boat}/checkin", data={"checked_in": "on", "length_in": "11.5", "inspection_status": "passed"})
+    assert "11.5 in" in r.text
+    assert c.post(f"/api/entry/{boat}/checkin", data={"checked_in": "on", "length_in": "long"}).status_code == 400
+    assert c.post(f"/api/entry/{boat}/checkin", data={"checked_in": "on", "length_in": "-3"}).status_code == 400
+    # a form without the field leaves the length alone
+    c.post(f"/api/entry/{boat}/checkin", data={"checked_in": "on", "inspection_status": "passed"})
+    with Session(app.state.engine) as s:
+        assert s.get(Entry, boat).length_in == 11.5
+
+    # config can require it
+    app.state.settings.defaults["regatta"].require_length = True
+    try:
+        assert "(optional)" not in c.get(f"/checkin/{boat}").text.split("Length in inches")[1][:40]
+        assert "data-required" in c.get(f"/checkin/{boat}").text
+        r = c.post(f"/api/entry/{boat}/checkin", data={"checked_in": "on", "length_in": "", "inspection_status": "passed"})
+        assert r.status_code == 400 and "Measure the boat before checking in" in r.text
+        # undoing a check-in never needs it
+        assert c.post(f"/api/entry/{boat}/checkin", data={"checked_in": "off", "length_in": ""}).status_code == 200
+        # the derby isn't affected
+        assert c.post(f"/api/entry/{car}/checkin", data={"checked_in": "on", "weight_oz": "", "inspection_status": "passed"}).status_code == 200
+    finally:
+        app.state.settings.defaults["regatta"].require_length = False
+
+
 def test_checkin_names_the_car(app, monkeypatch):
     c = other_client(app)
     join(app, c, Role.checkin)

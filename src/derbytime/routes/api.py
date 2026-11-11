@@ -15,6 +15,7 @@ from ..models import Entry, Event, Group, Heat, InspectionStatus, Official, Race
 from ..services import ServiceError, views
 from ..services.roster import clean_car_name
 from ..services.audit import audit
+from ..services.checkin import apply_measure, check_required, measure_for
 from ..services.race import RaceService
 from .deps import get_official, get_session, public_cached, race, render, require
 
@@ -200,20 +201,23 @@ async def checkin(entry_id: int, request: Request, s: Session = Depends(get_sess
     if not entry:
         raise ServiceError("Entry not found", 404)
     f = await form(request)
-    before = {"checked_in": entry.checked_in, "weight_oz": entry.weight_oz, "inspection": entry.inspection_status.value, "name": entry.name}
+    ev = s.get(Event, entry.event_id)
+    m = measure_for(ev, request.app.state.settings)
+
+    def state() -> dict:
+        return {"checked_in": entry.checked_in, m.field: m.value(entry), "inspection": entry.inspection_status.value, "name": entry.name}
+
+    before = state()
     renamed = "car_name" in f and clean_car_name(f["car_name"]) != entry.name
     if renamed:
         entry.name = clean_car_name(f["car_name"])
     entry.checked_in = f.get("checked_in") == "on"
-    w = f.get("weight_oz", "").strip()
-    try:
-        entry.weight_oz = float(w) if w else None
-    except ValueError:
-        raise ServiceError(f"{w!r} is not a weight.")
+    apply_measure(entry, m, f)
+    check_required(entry, m, "boat" if ev.type.value == "regatta" else "car")
     entry.inspection_status = InspectionStatus(f.get("inspection_status", entry.inspection_status.value))
     entry.inspection_notes = f.get("inspection_notes", "").strip() or None
     s.add(entry)
-    after = {"checked_in": entry.checked_in, "weight_oz": entry.weight_oz, "inspection": entry.inspection_status.value, "name": entry.name}
+    after = state()
     audit(s, auth.actor_for(me), "entry.checkin", "entry", entry.id, before=before, after=after)
     s.commit()
     keys = ["checkin", f"event-{entry.event_id}"]
@@ -222,8 +226,7 @@ async def checkin(entry_id: int, request: Request, s: Session = Depends(get_sess
     request.app.state.bus.publish("entry.updated", {"entry_id": entry.id, **after}, keys=keys)
     racer = s.get(Racer, entry.racer_id)
     group = s.get(Group, racer.group_id) if racer.group_id else None
-    ev = s.get(Event, entry.event_id)
-    return render(request, "partials/checkin_done.html", {"e": entry, "r": racer, "g": group, "event": ev})
+    return render(request, "partials/checkin_done.html", {"e": entry, "r": racer, "g": group, "event": ev, "m": m})
 
 
 # Check-in photos. kind "entry" is the car or boat; it maps to an Entry column

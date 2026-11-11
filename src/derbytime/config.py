@@ -29,6 +29,9 @@ class TypeDefaults:
     heat_seconds: float = 5.0
     heat_overhead_seconds: float = 40.0
     rerun_reasons: list[str] = field(default_factory=list)
+    # check-in: refuse to check a scout in without this measurement
+    require_weight: bool = False  # derby
+    require_length: bool = False  # regatta
 
 
 @dataclass

@@ -18,7 +18,7 @@
   </div>
 
   <ol class="ci-steps" aria-label="Steps">
-    <li>Scout</li><li>Photo</li><li>Weight</li><li>Inspection</li>
+    <li>Scout</li><li>Photo</li><li>{{ m.label }}</li><li>Inspection</li>
   </ol>
 
   <section class="ci-step" data-title="Scout">
@@ -54,10 +54,12 @@
     </div>
   </section>
 
-  <section class="ci-step" data-title="Weight" hidden>
-    <h2>Weigh the {{ label | lower }}</h2>
-    <label class="ci-field">Weight in ounces
-      <input name="weight_oz" inputmode="decimal" autocomplete="off" placeholder="e.g. 4.9" value="{{ e.weight_oz if e.weight_oz is not none else '' }}"></label>
+  <section class="ci-step" data-title="{{ m.label }}" hidden>
+    <h2>{{ m.verb }} the {{ label | lower }}</h2>
+    {% set v = m.value(e) %}
+    <label class="ci-field"><span>{{ m.label }} in {{ m.unit_name }}{% if not m.required %} <span class="muted small">(optional)</span>{% endif %}</span>
+      <input name="{{ m.field }}" class="ci-measure" data-label="{{ m.label | lower }}" {% if m.required %}data-required{% endif %}
+             inputmode="decimal" autocomplete="off" placeholder="e.g. {{ m.example }}" value="{{ '%g' % v if v is not none else '' }}"></label>
     <div class="ci-nav">
       <button type="button" data-back>← Back</button>
       <button type="button" class="primary" data-next>Next →</button>
@@ -73,7 +75,7 @@
     </div>
     <div class="ci-fail" hidden>
       <label class="ci-field">What needs fixing?
-        <input name="inspection_notes" autocomplete="off" placeholder="e.g. over weight, wheels too wide" value="{{ e.inspection_notes or '' }}"></label>
+        <input name="inspection_notes" autocomplete="off" placeholder="{{ 'e.g. too long, mast too tall' if label == 'Boat' else 'e.g. over weight, wheels too wide' }}" value="{{ e.inspection_notes or '' }}"></label>
       <button type="submit" class="bad ci-wide">Check in as failed</button>
     </div>
     <div class="ci-nav">

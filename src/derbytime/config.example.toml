@@ -33,6 +33,7 @@ passes_per_den = 2              # full lane rotations per den; order snakes down
 # few heats; after that its measured pace is used instead.
 heat_seconds = 5
 heat_overhead_seconds = 40
+require_weight = false          # check-in: true = can't check a car in without its weight
 # choices in the Re-run dropdown (operators can also pick "Other" and type one)
 rerun_reasons = [
   "False start / start gate problem",
@@ -55,6 +56,7 @@ finalists_per_group = 3
 passes_per_den = 2
 heat_seconds = 30
 heat_overhead_seconds = 60
+require_length = false          # check-in: true = can't check a boat in without its length
 rerun_reasons = [
   "False start",
   "Boat tipped over or sank",

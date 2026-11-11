@@ -136,7 +136,8 @@ class Entry(SQLModel, table=True):
     racer_id: int = Field(foreign_key="racer.id", index=True)
     number: int
     name: Optional[str] = None
-    weight_oz: Optional[float] = None
+    weight_oz: Optional[float] = None  # derby cars are weighed
+    length_in: Optional[float] = None  # regatta boats are measured
     checked_in: bool = False
     inspection_status: InspectionStatus = InspectionStatus.pending
     inspection_notes: Optional[str] = None

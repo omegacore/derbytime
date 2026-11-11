@@ -55,7 +55,7 @@ def roster_csv(session: Session, event: Event | None = None) -> str:
             select(Racer, Group).join(Group, Group.id == Racer.group_id, isouter=True).order_by(Racer.last_name, Racer.first_name)
         ).all()
         return _csv(header, ([r.first_name, r.last_name, r.member_id or "", g.name if g else "", "Active" if r.active else "Inactive"] for r, g in rows))
-    header += ["Car Number", "Car Name", "Checked In", "Weight (oz)", "Inspection", "Inspection Notes", "Race Status", "Race Status Reason"]
+    header += ["Car Number", "Car Name", "Checked In", "Weight (oz)", "Length (in)", "Inspection", "Inspection Notes", "Race Status", "Race Status Reason"]
     rows = session.exec(
         select(Entry, Racer, Group)
         .join(Racer, Racer.id == Entry.racer_id)
@@ -66,6 +66,7 @@ def roster_csv(session: Session, event: Event | None = None) -> str:
     return _csv(header, (
         [r.first_name, r.last_name, r.member_id or "", g.name if g else "", "Active" if r.active else "Inactive",
          e.number, e.name or "", "yes" if e.checked_in else "no", "" if e.weight_oz is None else e.weight_oz,
+         "" if e.length_in is None else e.length_in,
          e.inspection_status.value, e.inspection_notes or "", e.status.value if e.status else "racing", e.status_reason or ""]
         for e, r, g in rows
     ))
