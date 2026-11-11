@@ -70,6 +70,31 @@ def entry_info(session: Session, entry_ids: set[int]) -> dict[int, dict[str, Any
     }
 
 
+def lane_label_across(tracks: list[Track], lane: int) -> str:
+    """What a lane is called when the track isn't decided yet (a shared den
+    run): the one label every track uses for it, else each track's label in
+    track order, e.g. "1/3" for lane 1 of tracks labelled 1,2 and 3,4."""
+    labels = list(dict.fromkeys(t.lane_label(lane) for t in tracks if lane <= t.lane_count))
+    return "/".join(labels) or str(lane)
+
+
+def lane_heads(heat_views: list[dict[str, Any]]) -> list[str]:
+    """Column headings for a table of heats with one column per lane
+    position: each column's labels across the heats, e.g. "1/3" when the
+    heats are split between tracks labelled 1,2 and 3,4."""
+    cols: list[dict[str, None]] = []
+    for hv in heat_views:
+        for i, l in enumerate(hv["lanes"]):
+            if i == len(cols):
+                cols.append({})
+            for part in l["lane_label"].split("/"):
+                cols[i][part] = None
+    def key(label: str) -> tuple:
+        return (0, int(label), "") if label.lstrip("-").isdigit() else (1, 0, label)
+
+    return ["/".join(sorted(c, key=key)) for c in cols]
+
+
 def lanes_for(session: Session, heat_ids: list[int]) -> dict[int, list[HeatLane]]:
     out: dict[int, list[HeatLane]] = defaultdict(list)
     if heat_ids:
@@ -90,24 +115,31 @@ def heat_views(session: Session, heats: list[Heat], track_id: int | None = None)
     track_ids = {h.track_id for h in heats} | ({track_id} if track_id else set())
     tracks = {t.id: t for t in session.exec(select(Track).where(col(Track.id).in_(track_ids)))}
     events = {e.id: e for e in session.exec(select(Event).where(col(Event.id).in_({r.event_id for r in rounds.values()})))}
-    track_count: dict[int, int] = defaultdict(int)
-    for t in session.exec(select(Track).where(col(Track.event_id).in_(list(events)), Track.active == True)):  # noqa: E712
-        track_count[t.event_id] += 1
+    event_tracks: dict[int, list[Track]] = defaultdict(list)
+    for t in session.exec(select(Track).where(col(Track.event_id).in_(list(events)), Track.active == True).order_by(Track.id)):  # noqa: E712
+        event_tracks[t.event_id].append(t)
     out = []
     for h in heats:
         t = tracks[track_id or h.track_id]
         r = rounds[h.round_id]
         shared = (
-            track_id is None and h.status == HeatStatus.scheduled and r.kind == RoundKind.group and track_count[r.event_id] > 1
+            track_id is None and h.status == HeatStatus.scheduled and r.kind == RoundKind.group and len(event_tracks[r.event_id]) > 1
         )
+        if shared:
+            fits = [tr for tr in event_tracks[r.event_id] if {hl.lane for hl in lanes[h.id] if hl.entry_id} <= set(tr.usable_lanes)]
+            fits = fits or event_tracks[r.event_id]
         lane_rows = []
         for hl in lanes[h.id]:
             if hl.entry_id is None and hl.lane not in t.usable_lanes:
                 continue  # forecast on a track without this lane
             info = entries.get(hl.entry_id) if hl.entry_id else None
+            label = lane_label_across(fits, hl.lane) if shared else t.lane_label(hl.lane)
             lane_rows.append(
                 {
                     "lane": hl.lane,
+                    # what the lane is called; "1/3" while a shared heat's track is open
+                    "lane_label": label,
+                    "lane_fixed": not shared or len({tr.lane_label(hl.lane) for tr in fits if hl.lane <= tr.lane_count}) <= 1,
                     "bye": hl.entry_id is None,
                     **(info or {}),
                     "raw_time": hl.raw_time,
@@ -305,7 +337,7 @@ def ondeck_board(session: Session, track_id: int | None = None) -> dict[str, Any
     hole = take([hid for hid in line if hid not in deck])
     racing = set().union(*on_track_racers(session).values())
     rbh = racers_by_heat(session, deck + hole)
-    queued = heat_views(session, [heats[hid] for hid in deck + hole])
+    queued = heat_views(session, [heats[hid] for hid in deck + hole], track_id)  # one track's board: its lane labels
     for hv in queued:
         tids = where[hv["id"]]
         hv["go_to"] = [{"id": tid, "name": names[tid], "colour": colour[tid]} for tid in tids]
@@ -356,6 +388,7 @@ def track_state(session: Session, track: Track, timer_status: dict | None = None
             "name": track.name,
             "event_id": track.event_id,
             "lane_count": track.lane_count,
+            "lane_labels": [track.lane_label(n) for n in range(1, track.lane_count + 1)],
             "timing_source": track.timing_source,
             "min_time": track.min_time,
             "max_time": track.max_time,

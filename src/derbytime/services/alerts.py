@@ -33,7 +33,7 @@ class AlertService:
         if key in self._sent:
             return
         self._sent.add(key)
-        msg = f"{lane['racer_name']} (#{lane['number']}) {KIND_TEXT[kind]} — {heat['track_name']}, heat {heat['number']}, lane {lane['lane']}"
+        msg = f"{lane['racer_name']} (#{lane['number']}) {KIND_TEXT[kind]} — {heat['track_name']}, heat {heat['number']}, lane {lane['lane_label']}"
         self.bus.publish(
             "alert",
             {
@@ -45,7 +45,7 @@ class AlertService:
                 "heat_number": heat["number"],
                 "track_id": heat["track_id"],
                 "track_name": heat["track_name"],
-                "lane": lane["lane"],
+                "lane": lane["lane_label"],
                 "message": msg,
                 **(extra or {}),
             },
@@ -93,9 +93,9 @@ class AlertService:
         for heat in views.heat_views(session, views.on_track_heats(session)):
             for lane in heat["lanes"]:
                 if not lane["bye"] and (racer_ids is None or lane["racer_id"] in racer_ids):
-                    out[lane["racer_id"]] = {"kind": "racing", "track_name": heat["track_name"], "heat_number": heat["number"], "lane": lane["lane"]}
+                    out[lane["racer_id"]] = {"kind": "racing", "track_name": heat["track_name"], "heat_number": heat["number"], "lane": lane["lane_label"]}
         for kind, hv in self._up_next(session):
             for lane in hv["lanes"]:
                 if not lane["bye"] and (racer_ids is None or lane["racer_id"] in racer_ids) and lane["racer_id"] not in out:
-                    out[lane["racer_id"]] = {"kind": kind, "track_name": hv["track_name"], "heat_number": hv["number"], "lane": lane["lane"]}
+                    out[lane["racer_id"]] = {"kind": kind, "track_name": hv["track_name"], "heat_number": hv["number"], "lane": lane["lane_label"]}
         return out

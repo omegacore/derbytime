@@ -194,6 +194,21 @@ def _reschedule(s: Session, ev: Event, me, reason: str) -> str:
     return f" Unraced heats were rescheduled ({r['added']} queued, {r['kept']} raced heats kept)."
 
 
+def parse_lane_labels(text: str, lane_count: int) -> list[str] | None | str:
+    """Lane labels typed as "3, 4" (lane 1 is called 3, lane 2 is 4); a blank
+    keeps the lane's number. Returns the labels (None when they're all the
+    plain numbers) or an error message."""
+    labels = [x.strip() for x in text.split(",")] if text.strip() else []
+    if len(labels) > lane_count:
+        return f"The track has {lane_count} lanes but {len(labels)} lane labels."
+    if any(len(x) > 8 for x in labels):
+        return "Keep lane labels short (8 characters at most)."
+    full = [x or str(i) for i, x in enumerate(labels + [""] * (lane_count - len(labels)), 1)]
+    if len(set(full)) != len(full):
+        return "Each lane on a track needs a different label."
+    return None if full == [str(i) for i in range(1, lane_count + 1)] else full
+
+
 @router.post("/track/{track_id}")
 async def admin_update_track(track_id: int, request: Request, s: Session = Depends(get_session), me=Depends(get_official), rs: RaceService = Depends(race)):
     admin_only(me)
@@ -217,6 +232,11 @@ async def admin_update_track(track_id: int, request: Request, s: Session = Depen
         t.min_time = float(f.get("min_time", t.min_time))
         t.max_time = float(f.get("max_time", t.max_time))
         t.active = f.get("active") == "on"
+        if "lane_labels" in f:
+            labels = parse_lane_labels(f["lane_labels"], lanes)
+            if isinstance(labels, str):
+                return back(url, labels, True)
+            t.lane_labels = labels
         if "lanes_shown" in f:  # the lane checkboxes were on the form
             on = {int(x) for x in raw.getlist("lane_on")}
             t.disabled_lanes = [l for l in range(1, lanes + 1) if l not in on] or None
@@ -229,7 +249,7 @@ async def admin_update_track(track_id: int, request: Request, s: Session = Depen
     s.commit()
     note = ""
     if (t.active, t.usable_lanes) != capacity_before:
-        off = ", ".join(str(l) for l in (t.disabled_lanes or []))
+        off = ", ".join(t.lane_label(l) for l in (t.disabled_lanes or []))
         note = _reschedule(s, get_event(s, t.event_id), me, f"{t.name}: {'lanes ' + off + ' out' if off else 'all lanes in use'}{'' if t.active else ', track off'}")
     await rs.sync_timers()
     return back(url, f"{t.name} saved." + note)
@@ -535,13 +555,13 @@ async def admin_create_token(request: Request, s: Session = Depends(get_session)
             if t is None:
                 raise ServiceError("Choose the track for that lane.")
             if not 1 <= lane <= t.lane_count:
-                raise ServiceError(f"{t.name} has lanes 1–{t.lane_count}.")
+                raise ServiceError(f"{t.name} has lanes {t.lane_label(1)}–{t.lane_label(t.lane_count)}.")
         evergreen = f.get("evergreen") == "on"
         if role == Role.lane_official and f.get("all_lanes") == "on" and track_id:
             t = s.get(Track, track_id)
             for n in range(1, t.lane_count + 1):
                 auth.create_join_token(
-                    s, role, settings.join_token_minutes, track_id, n, f"{t.name} lane {n}", event_id=event_id, evergreen=evergreen
+                    s, role, settings.join_token_minutes, track_id, n, f"{t.name} lane {t.lane_label(n)}", event_id=event_id, evergreen=evergreen
                 )
         else:
             label = (f.get("label") or "").strip()

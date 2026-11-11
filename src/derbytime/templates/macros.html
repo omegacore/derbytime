@@ -24,7 +24,7 @@
 <div class="lanes">
   {% for l in h.lanes %}
   <div class="lane-row">
-    <div class="lane-no">{{ l.lane }}</div>
+    <div class="lane-no">{{ l.lane_label }}</div>
     <div>{{ racer_label(l, link) }}</div>
     <div class="num">{% if results %}{{ lane_result(l) }}{% endif %}</div>
   </div>

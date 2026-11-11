@@ -10,7 +10,7 @@
     <h1>Join as {{ ROLE_LABELS[jt.role.value] }}</h1>
     {% if jt.label %}<p><strong>{{ jt.label }}</strong></p>{% endif %}
     {% if event %}<p>Event: <strong>{{ event.name }}</strong></p>{% endif %}
-    {% if track %}<p>Track: <strong>{{ track.name }}</strong>{% if jt.lane %} · Lane <strong>{{ jt.lane }}</strong>{% endif %}</p>{% endif %}
+    {% if track %}<p>Track: <strong>{{ track.name }}</strong>{% if jt.lane %} · Lane <strong>{{ track.lane_label(jt.lane) }}</strong>{% endif %}</p>{% endif %}
     {% if me %}
       <div class="msg err">This phone is already <strong>{{ my_role }}</strong>{% if my_scope %} ({{ my_scope }}){% endif %}. Joining replaces that role.</div>
     {% endif %}

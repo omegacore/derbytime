@@ -1,4 +1,5 @@
-{# On-deck board: one row per scout, name first, an arrow to their track and lane. #}
+{# On-deck board: one row per scout, name first, an arrow to their track and lane.
+   Den-run heats in the shared queue go to whichever track is free, so they name no track. #}
 
 <div class="od">
   <div class="od-tracks">
@@ -11,7 +12,7 @@
       </div>
       {% if cur %}
         <div class="od-now">
-          {% for l in cur.lanes if not l.bye %}<span><b>{{ l.lane }}</b>{{ l.racer_name }}</span>{% endfor %}
+          {% for l in cur.lanes if not l.bye %}<span><b>{{ l.lane_label }}</b>{{ l.racer_name }}</span>{% endfor %}
         </div>
       {% else %}
         <div class="od-now muted">{% if t.remaining %}Waiting for the next heat{% else %}No more heats{% endif %}</div>
@@ -35,13 +36,17 @@
           <span class="od-name">{{ l.racer_name }}</span>
           <span class="od-sub">#{{ l.number }}{% if l.car_name %} · {{ l.car_name }}{% endif %}{% if l.group %} · {{ l.group }}{% endif %}</span>
         </div>
-        <span class="od-arrow {% if not h.any_track %}tc{{ h.go_to[0].colour }}{% endif %}" aria-hidden="true">➜</span>
-        <div class="od-dest {% if h.any_track %}od-any{% else %}tc{{ h.go_to[0].colour }}{% endif %}">
-          <span class="od-dest-track">{% if h.any_track %}Next free track
-            <span class="od-chips">{% for t in h.go_to %}<span class="od-chip tc{{ t.colour }}">{{ t.name }}</span>{% endfor %}</span>
-            {% else %}{{ h.go_to[0].name }}{% endif %}</span>
-          <span class="od-dest-lane"><small>LANE</small>{{ l.lane }}</span>
+        {% if not h.any_track %}
+        <span class="od-arrow tc{{ h.go_to[0].colour }}" aria-hidden="true">➜</span>
+        <div class="od-dest tc{{ h.go_to[0].colour }}">
+          <span class="od-dest-track">{{ h.go_to[0].name }}</span>
+          <span class="od-dest-lane"><small>LANE</small>{{ l.lane_label }}</span>
         </div>
+        {% elif l.lane_fixed %}
+        {# shared heat: staged on whichever track frees up, so no track; the lane only when every track calls it the same #}
+        <span class="od-arrow" aria-hidden="true">➜</span>
+        <div class="od-dest od-any"><span class="od-dest-lane"><small>LANE</small>{{ l.lane_label }}</span></div>
+        {% endif %}
       </div>
       {% endfor %}
     </section>
@@ -56,8 +61,8 @@
   <div class="od-hole">
     {% for h in board.in_hole %}
     <div class="od-hole-row">
-      {% if h.any_track %}<span class="od-chip od-any">Next free track</span>{% else %}<span class="od-chip tc{{ h.go_to[0].colour }}">{{ h.go_to[0].name }}</span>{% endif %}
-      <span class="od-hole-names">{% for l in h.lanes if not l.bye %}<span><b>{{ l.lane }}</b>{{ l.racer_name }}</span>{% endfor %}</span>
+      {% if not h.any_track %}<span class="od-chip tc{{ h.go_to[0].colour }}">{{ h.go_to[0].name }}</span>{% endif %}
+      <span class="od-hole-names">{% for l in h.lanes if not l.bye %}<span>{% if l.lane_fixed %}<b>{{ l.lane_label }}</b>{% endif %}{{ l.racer_name }}</span>{% endfor %}</span>
     </div>
     {% endfor %}
   </div>

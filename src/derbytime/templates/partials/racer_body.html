@@ -16,7 +16,7 @@
     {% for h in b.heats %}
       <tr>
         <td class="small">{{ h.round_name }}</td><td>{{ h.number }}</td><td class="small">{{ h.track_name }}</td>
-        <td class="num">{{ h.mine.lane }}</td>
+        <td class="num">{{ h.mine.lane_label }}</td>
         <td class="num">{% if h.status == 'approved' %}{{ lane_result(h.mine) }}{% endif %}</td>
         <td>{{ status_badge(h.status) }}</td>
       </tr>

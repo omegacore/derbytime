@@ -22,8 +22,9 @@ def get_official(request: Request, session: Session = Depends(get_session)) -> O
     o = auth.official_from_request(session, request)
     request.state.official = o
     if o is not None:
-        event_name, track_name = auth.bound_names(session, o)
-        request.state.official_scope = auth.scope_label(o, track_name, event_name)
+        event_name, track_name, lane_name = auth.bound_names(session, o)
+        request.state.official_scope = auth.scope_label(o, track_name, event_name, lane_name)
+        request.state.official_lane = lane_name
     return o
 
 

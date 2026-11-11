@@ -44,8 +44,8 @@
   <div class="placard role-{{ c.t.role.value }}">
     <div class="band">{{ ROLE_LABELS[c.t.role.value] }}</div>
     <div>
-      {% if c.track %}<div class="where">{{ c.track.name }}{% if c.t.lane %} · Lane {{ c.t.lane }}{% endif %}</div>{% endif %}
-      {% if c.t.label and not (c.track and c.t.label == c.track.name ~ ' lane ' ~ c.t.lane) %}<div class="who">{{ c.t.label }}</div>{% endif %}
+      {% if c.track %}<div class="where">{{ c.track.name }}{% if c.t.lane %} · Lane {{ c.track.lane_label(c.t.lane) }}{% endif %}</div>{% endif %}
+      {% if c.t.label and not (c.track and c.t.label in (c.track.name ~ ' lane ' ~ c.t.lane, c.track.name ~ ' lane ' ~ c.track.lane_label(c.t.lane or 0))) %}<div class="who">{{ c.t.label }}</div>{% endif %}
       <div class="ev">{{ c.event.name if c.event else '' }}</div>
     </div>
     <div class="qr">{{ c.svg | safe }}</div>

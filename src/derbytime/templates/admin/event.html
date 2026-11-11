@@ -41,16 +41,18 @@
       <label>Min s <input name="min_time" inputmode="decimal" value="{{ t.min_time }}" style="width:5em"></label>
       <label>Max s <input name="max_time" inputmode="decimal" value="{{ t.max_time }}" style="width:5em"></label>
       <label><input type="checkbox" name="active" {% if t.active %}checked{% endif %}> Active</label>
+      <label title="What each lane is called on this track, in order, e.g. 3, 4 for the second half of a split gutter. Den runs still share one queue across the tracks.">Lane labels
+        <input name="lane_labels" value="{{ (t.lane_labels or []) | join(', ') }}" placeholder="{% for l in range(1, t.lane_count + 1) %}{{ l }}{{ ', ' if not loop.last }}{% endfor %}" style="width:9em"></label>
     </div>
     <div class="row">
       <input type="hidden" name="lanes_shown" value="1">
       <span class="small"><strong>Lanes in use:</strong></span>
       {% for l in range(1, t.lane_count + 1) %}
-        <label class="lane-chip"><input type="checkbox" name="lane_on" value="{{ l }}" {% if l in t.usable_lanes %}checked{% endif %}> {{ l }}</label>
+        <label class="lane-chip"><input type="checkbox" name="lane_on" value="{{ l }}" {% if l in t.usable_lanes %}checked{% endif %}> {{ t.lane_label(l) }}</label>
       {% endfor %}
       <button type="submit">Save</button>
     </div>
-    {% if t.disabled_lanes %}<p class="small flag" style="margin:0">Out of service: lane {{ t.disabled_lanes | join(', ') }}</p>{% endif %}
+    {% if t.disabled_lanes %}<p class="small flag" style="margin:0">Out of service: lane {% for l in t.disabled_lanes %}{{ t.lane_label(l) }}{{ ', ' if not loop.last }}{% endfor %}</p>{% endif %}
   </form>
   {% endfor %}
   {% if has_schedule %}<p class="small muted">Untick a broken lane, change lanes, switch a track off, or add a track (e.g. another gutter). Unraced heats are rescheduled across the working tracks automatically; raced heats and their results are kept.</p>{% endif %}

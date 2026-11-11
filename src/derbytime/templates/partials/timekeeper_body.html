@@ -12,7 +12,7 @@
     <tbody>
     {% for l in h.lanes %}
       <tr class="{% if l.outlier %}flagged{% endif %}">
-        <td>{{ l.lane }}</td>
+        <td>{{ l.lane_label }}</td>
         <td>{{ racer_label(l) }}</td>
         <td class="num">{% if not l.bye %}<strong>{{ l.final_time | t(l.dnf) }}</strong>
           {% if l.raw_time is not none and l.final_time != l.raw_time %}<br><span class="muted small">raw {{ l.raw_time | t }}</span>{% endif %}
@@ -48,7 +48,7 @@
 {% for h in on_track %}
 <div class="card">
   <div class="row spread"><strong>{{ h.track_name }}: {{ heat_title(h) }}</strong>{{ status_badge(h.status) }}</div>
-  <div class="small">{% for l in h.lanes if not l.bye %}L{{ l.lane }} #{{ l.number }} {{ l.racer_name }}{% if l.has_result %} <strong>{{ l.final_time | t(l.dnf) }}</strong>{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</div>
+  <div class="small">{% for l in h.lanes if not l.bye %}L{{ l.lane_label }} #{{ l.number }} {{ l.racer_name }}{% if l.has_result %} <strong>{{ l.final_time | t(l.dnf) }}</strong>{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</div>
 </div>
 {% else %}
 <p class="muted">No heats staged.</p>

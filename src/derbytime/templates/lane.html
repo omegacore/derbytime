@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}{{ track.name }} lane {{ lane }}{% endblock %}
+{% block title %}{{ track.name }} lane {{ track.lane_label(lane) }}{% endblock %}
 {% block content %}
-<div class="row spread"><h1 style="margin:0">{{ track.name }} · Lane {{ lane }}</h1><span id="sw-wake" class="small muted"></span></div>
+<div class="row spread"><h1 style="margin:0">{{ track.name }} · Lane {{ track.lane_label(lane) }}</h1><span id="sw-wake" class="small muted"></span></div>
 <div id="lane-info" data-live="track-{{ track.id }}" hx-get="/partials/lane/{{ track.id }}/{{ lane }}" hx-trigger="load, rm-load"></div>
 <div id="stopwatch" class="sw" data-track="{{ track.id }}" data-lane="{{ lane }}">
   <div id="sw-time" class="sw-time">0.00</div>

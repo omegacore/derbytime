@@ -140,10 +140,11 @@ class StartPress(BaseModel):
 
 
 @router.post("/track/{track_id}/start")
-async def start_heat(track_id: int, body: StartPress, me: Official | None = Depends(get_official), rs: RaceService = Depends(race)):
+async def start_heat(track_id: int, body: StartPress, request: Request, me: Official | None = Depends(get_official), rs: RaceService = Depends(race)):
     """START press from the operator or a lane official; the earliest one counts."""
     require(auth.can_start(me, track_id), "starting heats on this track")
-    who = f"Lane {me.lane}" if me.role.value == "lane_official" else auth.ROLE_LABELS[me.role]
+    lane_name = getattr(request.state, "official_lane", None) or me.lane  # the track's label, looked up by get_official
+    who = f"Lane {lane_name}" if me.role.value == "lane_official" else auth.ROLE_LABELS[me.role]
     return await rs.register_start(track_id, body.heat_id, body.start_ms, who, auth.actor_for(me))
 
 

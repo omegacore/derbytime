@@ -20,7 +20,7 @@
   <summary><strong>{{ r.round.name }}</strong> <span class="muted small">({{ r.heats|length }} heats)</span></summary>
   <div class="table-wrap">
   <table>
-    <thead><tr><th>Heat</th><th>Track</th>{% for i in range(r.heats[0].lanes|length if r.heats else 0) %}<th>Lane {{ i + 1 }}</th>{% endfor %}<th></th></tr></thead>
+    <thead><tr><th>Heat</th><th>Track</th>{% for i in range(r.heats[0].lanes|length if r.heats else 0) %}<th>Lane {{ r.lane_heads[i] if i < r.lane_heads|length else i + 1 }}</th>{% endfor %}<th></th></tr></thead>
     <tbody>
     {% for h in r.heats %}
       <tr>

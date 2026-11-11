@@ -2,7 +2,7 @@
 {% block title %}{{ round.name }} heats · admin{% endblock %}
 {% macro car_label(c) %}#{{ c.number }} {{ c.racer_name.split(' ')[0] }}{% if ' ' in c.racer_name %} {{ c.racer_name.split(' ')[-1][:1] }}.{% endif %}{% if c.status %} ({{ c.status }}){% endif %}{% endmacro %}
 {% macro lane_select(key, lane, chosen) %}
-<select name="lane-{{ key }}-{{ lane }}" data-lane="{{ lane }}" aria-label="Lane {{ lane }}">
+<select name="lane-{{ key }}-{{ lane }}" data-lane="{{ lane }}" aria-label="Lane {{ lane_heads[lane] }}">
   <option value="">— empty —</option>
   {% for eid, c in choices.items() %}<option value="{{ eid }}" {% if eid == chosen %}selected{% endif %}>{{ car_label(c) }}</option>{% endfor %}
 </select>
@@ -18,7 +18,7 @@
   <form method="post" action="/admin/round/{{ round.id }}/heats" id="heat-editor" data-target="{{ target or '' }}">
     <input type="hidden" name="version" value="{{ version }}">
     <div class="table-wrap"><table class="heat-edit">
-      <thead><tr><th></th><th class="num">Heat</th>{% for l in lane_numbers %}<th>Lane {{ l }}</th>{% endfor %}<th></th></tr></thead>
+      <thead><tr><th></th><th class="num">Heat</th>{% for l in lane_numbers %}<th>Lane {{ lane_heads[l] }}</th>{% endfor %}<th></th></tr></thead>
       <tbody id="heat-rows">
       {% for r in rows %}
         {% if r.editable %}

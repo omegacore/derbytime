@@ -108,7 +108,8 @@ def event_partial(event_id: int, request: Request, s: Session = Depends(get_sess
         heats = s.exec(
             select(Heat).where(Heat.round_id == r.id, Heat.status != HeatStatus.rerun).order_by(Heat.seq)
         ).all()
-        schedule.append({"round": r, "heats": views.heat_views(s, list(heats))})
+        hvs = views.heat_views(s, list(heats))
+        schedule.append({"round": r, "heats": hvs, "lane_heads": views.lane_heads(hvs)})
     return render(
         request,
         "partials/event_body.html",

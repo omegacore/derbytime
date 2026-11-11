@@ -121,7 +121,7 @@ def heats_csv(session: Session, event: Event) -> str:
             raced = h.status in (HeatStatus.pending, HeatStatus.approved, HeatStatus.rerun)
             orig = numbers.get(h.rerun_of_id)
             out.append([
-                rnd.name, h.number, t.name, h.status.value, hl.lane, num, name, den,
+                rnd.name, h.number, t.name, h.status.value, t.lane_label(hl.lane), num, name, den,
                 _t(hl.raw_time) if raced else "", _t(hl.final_time) if raced else "", "yes" if hl.dnf else "",
                 hl.place or "", hl.source or "", hl.edit_reason or "",
                 h.results_at.isoformat(timespec="seconds") if h.results_at else "",

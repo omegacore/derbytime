@@ -163,11 +163,20 @@ class Track(SQLModel, table=True):
     active: bool = True
     # lanes out of service (e.g. a broken lane); the scheduler skips them
     disabled_lanes: Optional[list[int]] = Field(default=None, sa_column=Column(JSON))
+    # What each lane is called on the track, by lane number (e.g. ["3", "4"]
+    # for the second half of a split gutter). Only for display: heats, the
+    # scheduler and lane officials all work with lane numbers 1..lane_count,
+    # which is what lets a shared queue send any heat to any track.
+    lane_labels: Optional[list[str]] = Field(default=None, sa_column=Column(JSON))
 
     @property
     def usable_lanes(self) -> list[int]:
         off = set(self.disabled_lanes or [])
         return [l for l in range(1, self.lane_count + 1) if l not in off]
+
+    def lane_label(self, lane: int) -> str:
+        labels = self.lane_labels or []
+        return labels[lane - 1] if 0 < lane <= len(labels) and labels[lane - 1] else str(lane)
 
 
 class Round(SQLModel, table=True):

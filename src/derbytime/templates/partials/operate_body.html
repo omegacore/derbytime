@@ -23,7 +23,7 @@
         </div>
         <div class="small">Started by <strong>{{ cur.start_source }}</strong>. Lane officials press STOP as their boat finishes.
           {% set waiting = cur.lanes | selectattr('bye', 'equalto', false) | rejectattr('has_result') | list %}
-          {% if waiting %}<br>Waiting on lane {{ waiting | map(attribute='lane') | join(', ') }}.{% endif %}</div>
+          {% if waiting %}<br>Waiting on lane {{ waiting | map(attribute='lane_label') | join(', ') }}.{% endif %}</div>
       {% else %}
         <button class="start-btn" data-start-heat="{{ cur.id }}" data-track="{{ tid }}">START</button>
         <div class="small muted">Press the moment the boats are released. The start goes to every lane official, who then only press STOP. If a lane official presses START first, the earliest press counts.</div>
@@ -48,7 +48,7 @@
       <summary>Manual entry (timer failed)</summary>
       <form class="stack" hx-post="/api/track/{{ tid }}/manual" hx-swap="none" style="margin-top:8px">
         {% for l in cur.lanes if not l.bye %}
-          <label>Lane {{ l.lane }}: #{{ l.number }} {{ l.racer_name }}
+          <label>Lane {{ l.lane_label }}: #{{ l.number }} {{ l.racer_name }}
             <input name="lane_{{ l.lane }}" inputmode="decimal" placeholder="3.123 or DNF" value="{{ l.raw_time if l.raw_time is not none else ('DNF' if l.dnf else '') }}" autocomplete="off">
           </label>
         {% endfor %}
@@ -83,7 +83,7 @@
     <div class="row spread" style="border-bottom:1px solid var(--line);padding:6px 0">
       <div>
         <strong>{{ heat_title(h) }}</strong>{% if h.blocked %} <span class="flag small">racer busy elsewhere</span>{% endif %}<br>
-        <span class="small">{% for l in h.lanes %}L{{ l.lane }} {% if l.bye %}<span class="bye">bye</span>{% else %}#{{ l.number }} {{ l.racer_name }}{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</span>
+        <span class="small">{% for l in h.lanes %}L{{ l.lane_label }} {% if l.bye %}<span class="bye">bye</span>{% else %}#{{ l.number }} {{ l.racer_name }}{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</span>
       </div>
       {% if not cur and not loop.first %}
         <button class="small" hx-post="/api/track/{{ tid }}/stage" hx-vals='{"heat_id": "{{ h.id }}"}' hx-swap="none" {% if h.blocked %}disabled{% endif %}>Stage</button>
@@ -101,4 +101,4 @@
 </section>
 {% endif %}
 <p class="small"><a href="/display/ondeck/{{ tid }}" target="_blank">Open on-deck display</a> · <a href="/display/ondeck" target="_blank">all tracks</a>
-{% if st.timer.human %}· Lane pages: {% for n in range(1, st.track.lane_count + 1) %}<a href="/track/{{ tid }}/lane/{{ n }}">lane {{ n }}</a> {% endfor %}{% endif %}</p>
+{% if st.timer.human %}· Lane pages: {% for n in range(1, st.track.lane_count + 1) %}<a href="/track/{{ tid }}/lane/{{ n }}">lane {{ st.track.lane_labels[n - 1] }}</a> {% endfor %}{% endif %}</p>

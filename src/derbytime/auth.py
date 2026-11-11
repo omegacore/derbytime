@@ -224,22 +224,24 @@ def nav_for(o: Official | None) -> list[tuple[str, str]]:
     return links
 
 
-def scope_label(o: Official, track_name: str | None, event_name: str | None = None) -> str:
+def scope_label(o: Official, track_name: str | None, event_name: str | None = None, lane_name: str | None = None) -> str:
     """'Fall Derby · Main Track · lane 2', 'Fall Derby · all tracks' for operators,
-    just the event for other roles; '' for admins and officials without an event."""
+    just the event for other roles; '' for admins and officials without an event.
+    ``lane_name`` is the track's label for the lane (default: its number)."""
     parts = [event_name] if event_name else []
     if o.role == Role.lane_official:
-        parts.append(f"{track_name or 'track ' + str(o.track_id)} · lane {o.lane}")
+        parts.append(f"{track_name or 'track ' + str(o.track_id)} · lane {lane_name or o.lane}")
     elif o.role == Role.track_operator:
         parts.append(track_name or "all tracks")
     return " · ".join(parts)
 
 
-def bound_names(session: Session, o: Official | JoinToken) -> tuple[str | None, str | None]:
-    """(event name, track name) an official or join code is bound to."""
+def bound_names(session: Session, o: Official | JoinToken) -> tuple[str | None, str | None, str | None]:
+    """(event name, track name, lane label) an official or join code is bound to."""
     ev = session.get(Event, o.event_id) if o.event_id else None
     track = session.get(Track, o.track_id) if o.track_id else None
-    return (ev.name if ev else None), (track.name if track else None)
+    lane = track.lane_label(o.lane) if track and o.lane else None
+    return (ev.name if ev else None), (track.name if track else None), lane
 
 
 # --- URLs ----------------------------------------------------------------------

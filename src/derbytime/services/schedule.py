@@ -502,10 +502,14 @@ def heat_editor(session: Session, event: Event, rnd: Round) -> dict[str, Any]:
         }
         for h in heats
     ]
+    lane_numbers = sorted({l for r in rows for l in r["lanes"]} | set(new_track.usable_lanes))
+    run_tracks = _round_tracks(session, rnd, _active_tracks_or_error(session, event))
     return {
         "rows": rows,
         "choices": choices,
-        "lane_numbers": sorted({l for r in rows for l in r["lanes"]} | set(new_track.usable_lanes)),
+        "lane_numbers": lane_numbers,
+        # "1/3" when the run's tracks call a lane differently
+        "lane_heads": {l: views.lane_label_across(run_tracks, l) for l in lane_numbers},
         "new_lanes": new_track.usable_lanes,
         "target": rnd.races,
         "version": ",".join(str(r["heat"].id) for r in rows if r["editable"]),
