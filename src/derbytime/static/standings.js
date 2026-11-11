@@ -2,7 +2,9 @@
 // time and rotates every data-secs seconds. Live refreshes replace the slides
 // but keep the rotation where it was, then animate what changed on the slide
 // being shown: moved rows slide from their old spot (FLIP), rows whose numbers
-// changed flash, climbers get ▲n, new rows fade in. ←/→ step by hand.
+// changed flash, climbers get ▲n, new rows fade in. ←/→ step by hand,
+// space freezes the rotation (data keeps updating). Every data-egg full
+// rotations the progress-bar rider plays a gag for one slide (E forces it).
 (function () {
   const reduce = matchMedia("(prefers-reduced-motion: reduce)");
   let board = null;
@@ -10,6 +12,9 @@
   let deadline = 0;
   let timer = null;
   let before = null;
+  let frozen = false;
+  let left = 0; // ms left on the current slide, kept while frozen
+  let cycles = 0;
 
   const slides = () => [...board.querySelectorAll(".slide")];
   const dwell = () => (+board.dataset.secs || 12) * 1000;
@@ -30,6 +35,7 @@
     if (!el) return;
     el.style.transition = "none";
     el.style.width = (100 * (1 - ms / dwell())) + "%";
+    if (frozen) return;
     el.offsetWidth;
     el.style.transition = `width ${ms}ms linear`;
     el.style.width = "100%";
@@ -40,9 +46,34 @@
     const list = slides();
     if (list.length < 2) return bar(0);
     deadline = Date.now() + ms;
+    left = ms;
     bar(ms);
-    timer = setTimeout(() => go(1), ms);
+    if (!frozen) timer = setTimeout(() => go(1), ms);
   }
+
+  function freeze(on) {
+    if (on) left = Math.max(0, deadline - Date.now());
+    frozen = on;
+    document.body.classList.toggle("frozen", on);
+    const tag = document.getElementById("board-frozen");
+    if (tag) tag.hidden = !on;
+    schedule(left);
+  }
+
+  // The gag runs for one slide; restart it by re-adding the attribute.
+  function egg() {
+    const track = document.getElementById("board-progress");
+    if (!track || reduce.matches) return;
+    let ms = frozen ? left : deadline - Date.now();
+    if (!(ms > 3000)) ms = dwell(); // single slide, or nearly over
+    delete track.dataset.egg;
+    track.offsetWidth;
+    track.style.setProperty("--egg-ms", ms + "ms");
+    track.dataset.egg = "";
+  }
+  document.addEventListener("animationend", (e) => {
+    if (e.animationName === "egg-wheel" || e.animationName === "egg-duck") delete document.getElementById("board-progress").dataset.egg;
+  });
 
   function show(slide, instant) {
     if (!slide) return;
@@ -51,8 +82,9 @@
       s.classList.toggle("active", s === slide);
       s.classList.toggle("entering", s === slide && !instant); // badge pop only on a real slide change
     });
-    current = { id: slide.dataset.slide, group: slide.dataset.group, index: slides().indexOf(slide) };
     const track = document.getElementById("board-progress");
+    if (track && current && current.id !== slide.dataset.slide) delete track.dataset.egg;
+    current = { id: slide.dataset.slide, group: slide.dataset.group, index: slides().indexOf(slide) };
     if (track && slide.dataset.vehicle) track.dataset.vehicle = slide.dataset.vehicle;
     fit(slide);
     if (instant) requestAnimationFrame(() => board.classList.remove("instant"));
@@ -64,6 +96,8 @@
     const i = current ? list.findIndex((s) => s.dataset.slide === current.id) : -1;
     show(list[(i + step + list.length) % list.length], false);
     schedule(dwell());
+    const every = +board.dataset.egg || 0;
+    if (step > 0 && i + step >= list.length && every && ++cycles % every === 0) egg();
   }
 
   function snapshot(slide) {
@@ -149,6 +183,10 @@
     if (!board) return;
     if (e.key === "ArrowRight") go(1);
     if (e.key === "ArrowLeft") go(-1);
+    if (e.key === " " || e.key === "e" || e.key === "E") e.preventDefault();
+    if (e.repeat) return;
+    if (e.key === " ") freeze(!frozen);
+    if (e.key === "e" || e.key === "E") egg();
   });
   window.addEventListener("resize", () => board && slides().forEach(fit));
 

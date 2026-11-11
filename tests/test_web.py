@@ -140,6 +140,24 @@ def test_board_vehicle_matches_event_name():
     assert board_vehicle(Event(name="Spring races", type=EventType.derby)) == "car"
 
 
+def test_standings_board_by_event_type(client):
+    both = client.get("/partials/standings").text
+    assert "Demo Pinewood Derby" in both and "Demo Rain Gutter Regatta" in both
+    derby = client.get("/partials/standings?type=derby").text
+    assert "Demo Pinewood Derby" in derby and "Regatta" not in derby
+    assert 'data-vehicle="car"' in derby and 'data-vehicle="boat"' not in derby
+    regatta = client.get("/partials/standings?type=regatta").text
+    assert "Demo Rain Gutter Regatta" in regatta and "Pinewood" not in regatta
+
+    r = client.get("/display/derby?secs=5&egg=2", follow_redirects=False)
+    assert r.status_code == 307 and r.headers["location"] == "/display/standings?type=derby&secs=5&egg=2"
+    page = client.get("/display/derby?secs=5&egg=2").text
+    assert 'data-secs="5"' in page and 'data-egg="2"' in page
+    assert 'hx-get="/partials/standings?rows=10&amp;type=derby"' in page
+    assert client.get("/display/hovercraft").status_code == 422
+    assert client.get("/display/ondeck").status_code == 200  # not swallowed by /display/{kind}
+
+
 def test_event_standings_table_has_no_vehicle_column(client):
     assert "col-car" not in client.get("/partials/event/1").text
 

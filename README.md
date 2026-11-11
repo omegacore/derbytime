@@ -274,7 +274,7 @@ Every change is in the audit log.
   - *every heat*: every lane of every heat, re-runs included, with raw and final times, places, edit reasons and timestamps.
 - `/admin/roster.csv` exports the whole pack roster.
 
-Displays for a projector or TV: `/display/ondeck` (every active track on one screen: each upcoming heat says which track to go to, or "next free track" with the candidates, and a big lane number by each name), `/display/ondeck/{track}` (the same for one track) and `/display/standings` (add `?event=ID` to limit it to one event). Families use `/`: search, schedule and results, and **☆ Follow**. Follows are stored on the phone. Alerts fire at "2 heats away", "on deck", "racing now" and "results posted" as an in-page banner with a beep and vibration (sound needs one tap on the page first, a browser rule).
+Displays for a projector or TV: `/display/ondeck` (every active track on one screen: each upcoming heat says which track to go to, or "next free track" with the candidates, and a big lane number by each name), `/display/ondeck/{track}` (the same for one track) and `/display/standings` (add `?event=ID` to limit it to one event; `/display/derby` and `/display/regatta` show just that kind when both run). On the board, ←/→ step through slides and the space bar pauses the rotation (results keep updating). Every few full rotations (`?egg=N`, default 5, `0` turns it off) the progress-bar car or boat has a small mishap; press E to see it. Families use `/`: search, schedule and results, and **☆ Follow**. Follows are stored on the phone. Alerts fire at "2 heats away", "on deck", "racing now" and "results posted" as an in-page banner with a beep and vibration (sound needs one tap on the page first, a browser rule).
 
 ### Scoring modes
 

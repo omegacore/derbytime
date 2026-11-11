@@ -363,6 +363,63 @@ body.board main { max-width: none; padding: 0; }
 .rider-boat { animation: rider-bob 2.4s ease-in-out infinite; transform-origin: 50% 80%; }
 .rider-car { animation: rider-rumble .35s linear infinite; }
 
+/* Easter egg, every few full rotations (standings.js sets data-egg for one
+   slide; --egg-ms is that slide's dwell): the car loses a wheel, a rubber duck
+   overtakes the boat. */
+.board-rider .egg { visibility: hidden; }
+.board-rider .bubble { fill: #fff; stroke: #001a3d; stroke-width: 1.2; }
+.board-rider text { font: 800 7px Bahnschrift, "Arial Narrow", sans-serif; fill: #001a3d; text-anchor: middle; }
+.board-rider .egg-sparks path { stroke: #ffb21f; stroke-width: 1.4; stroke-linecap: round; }
+.board-rider .duck { fill: #ffd21f; stroke: #001a3d; stroke-width: 1.2; stroke-linejoin: round; }
+.board-rider .beak { fill: #ff8a1f; stroke: #001a3d; stroke-width: .8; stroke-linejoin: round; }
+.board-rider .eye { fill: #001a3d; }
+.board-rider .wing { fill: none; stroke: #001a3d; stroke-width: 1; stroke-linecap: round; }
+.egg-wheel, .egg-chassis, .board-rider .sail, .egg-duck-bob { transform-box: fill-box; }
+.egg-wheel { transform-origin: center; }
+.egg-chassis { transform-origin: 14% 100%; } /* pivot on the rear wheel */
+.board-rider .sail { transform-origin: 50% 100%; }
+.board-progress[data-egg] .egg-wheel { animation: egg-wheel var(--egg-ms, 12s) ease-out forwards; }
+.board-progress[data-egg] .egg-chassis { animation: egg-chassis var(--egg-ms, 12s) linear forwards; }
+.board-progress[data-egg] .egg-sparks { animation: egg-show-sparks var(--egg-ms, 12s) step-end forwards; }
+.board-progress[data-egg] .egg-sparks path { animation: egg-flicker .12s steps(2) infinite; }
+.board-progress[data-egg] .egg-say { animation: egg-show-say var(--egg-ms, 12s) step-end forwards; }
+.board-progress[data-egg] .egg-duck { animation: egg-duck var(--egg-ms, 12s) linear forwards; }
+.board-progress[data-egg] .egg-duck-bob { animation: rider-bob 1.1s ease-in-out infinite; transform-origin: 50% 80%; }
+.board-progress[data-egg] .egg-quack { animation: egg-show-quack var(--egg-ms, 12s) step-end forwards; visibility: hidden; }
+.board-progress[data-egg] .sail { animation: egg-droop var(--egg-ms, 12s) ease-in-out forwards; }
+@keyframes egg-wheel {
+  0%, 22% { transform: none; }
+  25% { transform: translate(3px, -12px) rotate(120deg); }
+  30% { transform: translate(9px, 0) rotate(300deg); }
+  35% { transform: translate(16px, -5px) rotate(480deg); }
+  40% { transform: translate(24px, 0) rotate(660deg); }
+  100% { transform: translate(420px, 0) rotate(5400deg); }
+}
+@keyframes egg-chassis {
+  0%, 22% { transform: none; }
+  25% { transform: rotate(-7deg); }
+  30%, 100% { transform: rotate(11deg); }
+}
+@keyframes egg-show-sparks { 0% { visibility: hidden; } 30%, 100% { visibility: visible; } }
+@keyframes egg-flicker { 50% { opacity: .2; } }
+@keyframes egg-show-say { 0% { visibility: hidden; } 25% { visibility: visible; } 60%, 100% { visibility: hidden; } }
+@keyframes egg-duck {
+  0% { visibility: visible; transform: translate(-60px, 0); opacity: 0; }
+  12% { opacity: 1; }
+  45% { transform: translate(-6px, 0); }
+  70% { transform: translate(34px, 0); }
+  100% { visibility: visible; transform: translate(110px, 0); }
+}
+@keyframes egg-show-quack { 0% { visibility: hidden; } 40% { visibility: visible; } 65%, 100% { visibility: hidden; } }
+@keyframes egg-droop { 0%, 45% { transform: none; } 55%, 100% { transform: scaleY(.45) skewX(-8deg); } }
+/* space bar: hold the slide (live data still updates) */
+.board-frozen {
+  position: fixed; top: 1vw; left: 50%; transform: translateX(-50%); z-index: 20;
+  padding: .4vw 1.1vw; border-radius: 999px; font-weight: 800; font-size: max(12px, 1.1vw); letter-spacing: .08em;
+  background: rgba(0, 26, 61, .85); color: #fff; border: 1px solid rgba(255, 255, 255, .4);
+}
+body.frozen .board-rider, body.frozen .board-rider * { animation-play-state: paused !important; }
+
 @media (prefers-reduced-motion: reduce) {
   .slide, .slide tr[data-key], .slide tr[data-key] td, .slide .rank, .slide-badge, .spotlight, .board-rider svg, .board-live .dot { animation: none !important; transition: none !important; }
   .slide { transform: none; }

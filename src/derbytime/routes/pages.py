@@ -235,16 +235,30 @@ def board_slides(s: Session, events: list[Event], per_page: int) -> list[dict]:
 
 
 @router.get("/display/standings")
-def standings_display(request: Request, event: int | None = None, rows: int = 10, secs: int = 12):
-    """Kiosk board. ``rows`` per slide, ``secs`` on each slide."""
-    q = f"?rows={max(3, rows)}" + (f"&event={event}" if event else "")
-    return render(request, "display_standings.html", {"query": q, "secs": max(3, secs), "kiosk": True})
+def standings_display(
+    request: Request, event: int | None = None, type: EventType | None = None, rows: int = 10, secs: int = 12, egg: int = 5
+):
+    """Kiosk board. ``rows`` per slide, ``secs`` on each slide; ``type`` keeps
+    it to the derby or the regatta when both run. ``egg``: full rotations
+    between easter eggs (0 = never)."""
+    q = f"?rows={max(3, rows)}" + (f"&event={event}" if event else "") + (f"&type={type.value}" if type else "")
+    ctx = {"query": q, "secs": max(3, secs), "egg": max(0, egg), "kiosk": True}
+    return render(request, "display_standings.html", ctx)
+
+
+@router.get("/display/{kind}")
+def standings_display_for(kind: EventType, request: Request):
+    """Short kiosk URLs: /display/derby, /display/regatta (other options pass through)."""
+    extra = f"&{request.url.query}" if request.url.query else ""
+    return RedirectResponse(f"/display/standings?type={kind.value}{extra}", 307)
 
 
 @router.get("/partials/standings")
 @public_cached
-def standings_partial(request: Request, event: int | None = None, rows: int = 10, s: Session = Depends(get_session)):
-    events = [s.get(Event, event)] if event else active_events(s)
+def standings_partial(
+    request: Request, event: int | None = None, type: EventType | None = None, rows: int = 10, s: Session = Depends(get_session)
+):
+    events = [s.get(Event, event)] if event else [e for e in active_events(s) if not type or e.type == type]
     slides = board_slides(s, [e for e in events if e], max(3, rows))
     return render(request, "partials/standings.html", {"slides": slides, "icons": rank_icons()})
 
