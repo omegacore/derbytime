@@ -494,11 +494,13 @@ def admin_print_codes(request: Request, event_id: int | None = None, ids: str = 
     base = auth.base_url(settings, request)
     tracks = {t.id: t for t in s.exec(select(Track))}
     events = {e.id: e for e in s.exec(select(Event))}
-    # error level "h" survives a crumpled, taped-up sheet better than "m"
+    # error level "h" survives a crumpled, taped-up sheet better than "m".
+    # omitsize gives a viewBox instead of a fixed width/height, so the sheet's
+    # CSS scales the code; with a fixed size, shrinking it cropped the bottom.
     codes = []
     for t in toks:
         c = _code_view(t, base, tracks, events, svg=False)
-        c["svg"] = segno.make(c["url"], error="h").svg_inline(scale=8, border=3, dark="#000", light="#fff")
+        c["svg"] = segno.make(c["url"], error="h").svg_inline(scale=8, border=3, dark="#000", light="#fff", omitsize=True)
         codes.append(c)
     return render(request, "admin/print_codes.html", {"codes": codes, "base": base, "pinned": bool(settings.public_base_url)})
 

@@ -233,6 +233,8 @@ def test_evergreen_codes_never_expire_and_take_many_phones(app, admin):
     assert "Active codes" not in page
     sheet = admin.get(f"/admin/officials/print?event_id={g.event_id}").text
     assert sheet.count('class="placard') == 2 and sheet.count("<svg") == 2 and f"/join/{token}" in sheet
+    # scalable: a fixed width/height made the print CSS crop the code's bottom
+    assert "<svg viewBox=" in sheet and "<svg width=" not in sheet
     assert "public_base_url" in sheet  # warns that the auto-detected address may change
     one = admin.get(f"/admin/officials/print?ids={tid}").text
     assert one.count('class="placard') == 1 and "Lane 1" in one
