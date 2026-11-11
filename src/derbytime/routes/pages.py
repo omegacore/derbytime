@@ -78,7 +78,7 @@ def search(request: Request, q: str = "", s: Session = Depends(get_session)):
     if q:
         like = f"%{q}%"
         cond = or_(col(Racer.first_name).ilike(like), col(Racer.last_name).ilike(like))
-        if q.isdigit():
+        if q.removeprefix("-").isdigit():  # non-scout dens (Pirates) race with negative numbers
             ids = s.exec(select(Entry.racer_id).where(Entry.number == int(q))).all()
             cond = or_(cond, col(Racer.id).in_(ids))
         rows = s.exec(

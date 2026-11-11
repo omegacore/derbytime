@@ -35,7 +35,7 @@
 
   <form class="row" method="post" action="/admin/entry/{{ e.id }}">
     <input type="hidden" name="next" value="{{ next }}">
-    <label>Car # <input name="number" type="number" min="1" value="{{ e.number }}" style="width:5.5em"></label>
+    <label>Car # <input name="number" type="number" value="{{ e.number }}" style="width:5.5em"></label>
     <label>Car name <input name="car_name" maxlength="40" value="{{ e.name or '' }}"></label>
     <button type="submit">Save</button>
   </form>
@@ -77,7 +77,7 @@
   <h2>Enter in an event</h2>
   <form class="row" method="post" action="/admin/racer/{{ racer.id }}/enter">
     <select name="event_id">{% for ev in events %}<option value="{{ ev.id }}">{{ ev.name }}</option>{% endfor %}</select>
-    <input name="number" type="number" min="1" placeholder="Car # (auto)" style="width:8em">
+    <input name="number" type="number" placeholder="Car # (auto)" style="width:8em">
     <input name="car_name" maxlength="40" placeholder="Car name">
     <label><input type="checkbox" name="checked_in"> Checked in</label>
     <button type="submit">Enter</button>

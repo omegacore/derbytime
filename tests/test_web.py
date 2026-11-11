@@ -7,7 +7,7 @@ from sqlmodel import Session, select
 
 from derbytime import auth
 from derbytime.app import create_app
-from derbytime.models import AuditLog, Entry, Event, Group, Heat, HeatLane, HeatStatus, JoinToken, Official, Role, Track, utcnow
+from derbytime.models import AuditLog, Entry, Event, Group, Heat, HeatLane, HeatStatus, JoinToken, Official, Racer, Role, Track, utcnow
 from derbytime.seed import seed_demo
 
 
@@ -62,6 +62,14 @@ def test_public_pages_render(client, app):
         r = client.get(url)
         assert r.status_code == 200, (url, r.text[:300])
     assert "Liam" in client.get("/partials/search?q=liam").text
+    with Session(app.state.engine) as s:  # Pirates (non-scouts) race with negative numbers
+        e = s.exec(select(Entry).where(Entry.number == 101)).first()
+        e.number = -3
+        s.add(e)
+        s.commit()
+        name = s.get(Racer, e.racer_id).first_name
+    app.state.page_cache.bump()
+    assert name in client.get("/partials/search?q=-3").text
     assert "Main Track" in client.get("/partials/home").text
     assert "ON DECK" in client.get("/partials/ondeck").text and "LANE" in client.get(f"/partials/ondeck/{t.id}").text
     assert client.get("/static/vendor/htmx.min.js").status_code == 200
